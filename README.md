@@ -34,7 +34,7 @@ Scripts ending in `_fixed` are the final versions. They were run after a correct
 
 The `YAIB/` folder is the YAIB framework as modified by Jagd et al. (https://github.com/Katja-Jagd/YAIB, `development` branch). Almost all of it is unchanged. The files changed for this project are:
 
-- `YAIB/icu_benchmarks/models/dl_models/tpc.py`: the TPC model (added, then corrected after the bug fix)
+- `YAIB/icu_benchmarks/models/dl_models/tpc.py`: the TPC model (added, then corrected)
 - `YAIB/configs/prediction_models/BAT_LOS.gin`: BAT configuration for LOS
 - `YAIB/configs/prediction_models/common/DLCommon_nodsa.gin`: edited common configuration
 
@@ -56,7 +56,7 @@ Run the steps in this order.
 
 1. **Pick the cohort (R).** Install `ricu` and convert MIMIC-III for it. Next to the `R/` folder, create a `config.yaml` with two lines: `ricu_data_path` (where the converted MIMIC data is) and `out_dir` (where the output should go). Then run `base_cohort.R` followed by `los.R` from inside the `R` folder.
 2. **Build the datasets.** Run the scripts in `data_prep/`. They create the input arrays for BAT and TPC, scale the features, build the healthy reference baseline and map each patient to a diagnosis group.
-3. **Train the models.** TPC is small enough to train on a laptop CPU using the scripts in `training/`. BAT needs a GPU, so it was fine-tuned it on Google Colab using the notebooks in `training/`.
+3. **Train the models.** TPC is small enough to train on a laptop CPU using the scripts in `training/`. BAT needs a GPU, so it was fine-tuned on Google Colab using the notebooks in `training/`.
 4. **Evaluate and explain.** Run the scripts in `evaluation/` to measure accuracy, then `interpretability/` to see which inputs each model relies on. After that, run `analysis_checks/` and `figures/`.
 
 SOFA scores were pulled with ricu's `load_concepts` in an interactive R session, not saved as a script. The analysis scripts read the resulting tables.
