@@ -1,8 +1,8 @@
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# 1. Load the per-patient errors and targets already saved from Phase D
-# ---------------------------------------------------------------------------
+
+# 1. Load the per-patient errors and targets 
+
 tpc_error = np.load("tpc_error.npy")
 bat_error = np.load("bat_error.npy")
 
@@ -12,10 +12,9 @@ bat_targets = np.load("bat_test_targets.npy")
 n_total = len(tpc_error)
 print(f"Test set size: {n_total}\n")
 
-# ---------------------------------------------------------------------------
-# 2. Test several thresholds, not just -3.0, to check the finding is robust
-#    and not an artifact of one arbitrary cutoff choice.
-# ---------------------------------------------------------------------------
+
+# 2. Test several thresholds
+
 thresholds = [-1.0, -2.0, -3.0, -4.0, -5.0]
 
 results = {"threshold": [], "tpc_n_dangerous": [], "tpc_pct_dangerous": [],
@@ -41,11 +40,8 @@ for t in thresholds:
     results["bat_n_dangerous"].append(bat_n)
     results["bat_pct_dangerous"].append(bat_pct)
 
-# ---------------------------------------------------------------------------
-# 3. Save a dangerous-case mask for EACH threshold, for both models,
-#    with explicit, clearly-named files - so any of these can be
-#    referenced directly later without re-running this script.
-# ---------------------------------------------------------------------------
+
+# 3. Save a dangerous-case mask for EACH threshold, for both models 
 for t in thresholds:
     t_label = str(abs(t)).replace(".", "_")  # e.g. -3.0 -> "3_0"
 
@@ -55,10 +51,9 @@ for t in thresholds:
     np.save(f"tpc_dangerous_mask_threshold_{t_label}days.npy", tpc_mask)
     np.save(f"bat_dangerous_mask_threshold_{t_label}days.npy", bat_mask)
 
-# ---------------------------------------------------------------------------
-# 4. Also save the summary table itself as a CSV, for easy reference
-#    or inclusion in the report as a table.
-# ---------------------------------------------------------------------------
+
+# 4. Also save the summary table itself 
+
 import csv
 
 with open("dangerous_case_threshold_sensitivity.csv", "w", newline="") as f:

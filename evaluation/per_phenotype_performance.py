@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-# --- Load the full cohort's patient ID order and the test-split indices ---
+# Load the full cohort's patient ID order and the test-split indice
 stay_id_order = pd.read_csv("bat_stay_id_order.csv")  # full 51,835-patient order
 test_rows = np.load("bat_test_rows.npy")               # indices into that order for the test split
 
@@ -12,7 +12,7 @@ test_stay_ids = test_stay_ids.rename(columns={id_col: "stay_id"})
 print(f"Test split size from indices: {len(test_rows)}")
 print(f"Test stay_id table size: {len(test_stay_ids)}")
 
-# --- Load predictions/targets for both models ---
+# Load predictions/targets for both models 
 bat_pred = np.load("bat_test_predictions.npy")
 bat_true = np.load("bat_test_targets.npy")
 
@@ -31,7 +31,7 @@ phenotype_map = pd.read_csv("cohort_icd9_phenotype_mapping_with_fallback.csv")
 
 DANGEROUS_THRESHOLD = -3.0  # matches Phase D's dangerous-case definition
 
-# --- Build one long table: stay_id, model, error, phenotype ---
+# Build one long table: stay_id, model, error, phenotype
 records = []
 for model_name, pred, true in [("BAT", bat_pred, bat_true), ("TPC", tpc_pred, tpc_true)]:
     error = pred.flatten() - true.flatten()  # predicted - true, matches Phase D's sign convention
@@ -50,7 +50,7 @@ print(f"\nMatched {len(perf)} of {2 * len(test_stay_ids)} expected rows to a phe
 
 perf.to_csv("per_patient_error_with_phenotype.csv", index=False)
 
-# --- Aggregate to per-phenotype, per-model performance ---
+# Aggregate to per-phenotype, per-model performance 
 performance_summary = (
     perf.groupby(["phenotype", "model"])
     .agg(

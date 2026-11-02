@@ -1,23 +1,6 @@
-"""
-Step 3 of the BAT re-run: evaluate the new BAT (MIMIC-IV + eICU checkpoint)
-with exactly the same methods as your original Phase D scripts:
-  - phase_d_evaluation.py / phase_d_evaluation_tpc_fixed.py  (error, dangerous cases, 7-day cutoff)
-  - threshold_sensitivity_test.py                             (thresholds -1 to -5)
-  - significance_test_by_phenotype_fixed.py                   (paired Wilcoxon per disease group)
+#evaluate the new BAT (MIMIC-IV + eICU checkpoint)
 
-It prints TPC (fixed), the ORIGINAL BAT and the NEW BAT side by side, so you can
-see straight away whether the findings held up.
 
-BEFORE RUNNING: download these two files from Drive (BAT_colab folder) into your
-YAIB folder:
-    bat_test_predictions_ivEicu.npy
-    bat_test_targets_ivEicu.npy
-
-Run from your YAIB folder:
-    python evaluate_bat_ivEicu.py
-
-Nothing is overwritten. Every file it saves ends in _ivEicu.
-"""
 import os
 import csv
 import numpy as np
@@ -27,11 +10,9 @@ from sklearn.metrics import roc_auc_score, average_precision_score, precision_sc
 
 TAG = "_ivEicu"
 
-# ---------------------------------------------------------------------------
-# 1. Load predictions and check alignment BEFORE computing anything.
-#    Why: every comparison below is per patient, so if the new BAT's rows were
-#    in a different order from TPC's, every number would be silently wrong.
-# ---------------------------------------------------------------------------
+
+# 1. Load predictions and check alignment BEFORE computing anything
+
 tpc_preds = np.load("tpc_test_predictions_fixed.npy").ravel().astype(np.float64)
 tpc_targets = np.load("tpc_test_targets_fixed.npy").ravel().astype(np.float64)
 old_preds = np.load("bat_test_predictions.npy").ravel().astype(np.float64)
@@ -70,9 +51,8 @@ models = {
 }
 errors = {name: preds - targets for name, preds in models.items()}
 
-# ---------------------------------------------------------------------------
-# 2. PRIMARY: continuous error. Same formulas as phase_d_evaluation.py.
-# ---------------------------------------------------------------------------
+
+# 2. PRIMARY: continuous error
 def row(label, fmt, func):
     print(f"{label:<34}" + "".join(f"{format(func(n), fmt):>20}" for n in models))
 
@@ -84,10 +64,8 @@ row("Mean error / bias (days)", ".4f", lambda n: errors[n].mean())
 row("Std of error (days)", ".4f", lambda n: errors[n].std())
 row("Median absolute error (days)", ".4f", lambda n: np.median(np.abs(errors[n])))
 
-# ---------------------------------------------------------------------------
+
 # 3. Dangerous cases at -3 days, plus the -1 to -5 sensitivity check.
-#    Same rule as before: dangerous = error <= threshold.
-# ---------------------------------------------------------------------------
 print("\n=== Dangerous cases (error <= -3 days) ===")
 print(f"{'':<34}" + "".join(f"{n:>20}" for n in models))
 row("Count", "d", lambda n: int((errors[n] <= -3.0).sum()))
@@ -101,10 +79,8 @@ print(f"{'Threshold':<34}" + "".join(f"{n:>20}" for n in models))
 for t in thresholds:
     print(f"{t:<34}" + "".join(f"{100 * (errors[n] <= t).mean():>20.2f}" for n in models))
 
-# ---------------------------------------------------------------------------
-# 4. SECONDARY: binary 7-day cutoff. Same as phase_d_evaluation.py:
-#    true label = true LOS >= 7, score = predicted LOS, precision at predicted >= 7.
-# ---------------------------------------------------------------------------
+
+# 4. SECONDARY: binary 7-day cutoff. Same as phase_d_evaluation.py
 true_binary = (targets >= 7.0).astype(int)
 print(f"\n=== Binary 7-day cutoff (SECONDARY), prolonged stays: "
       f"{true_binary.sum()} ({100 * true_binary.mean():.1f}%) ===")
@@ -113,10 +89,8 @@ row("AUROC", ".4f", lambda n: roc_auc_score(true_binary, models[n]))
 row("AUPRC", ".4f", lambda n: average_precision_score(true_binary, models[n]))
 row("Precision", ".4f", lambda n: precision_score(true_binary, (models[n] >= 7.0).astype(int), zero_division=0))
 
-# ---------------------------------------------------------------------------
+
 # 5. Paired Wilcoxon on absolute error over the whole test set.
-#    Same test as significance_test_by_phenotype_fixed.py, just not split by group.
-# ---------------------------------------------------------------------------
 abs_tpc = np.abs(errors["TPC (fixed)"])
 abs_old = np.abs(errors["BAT original"])
 abs_new = np.abs(errors["BAT new (IV+eICU)"])
@@ -125,10 +99,9 @@ print(f"  TPC vs BAT new:          p = {wilcoxon(abs_tpc, abs_new).pvalue:.3e}")
 print(f"  TPC vs BAT original:     p = {wilcoxon(abs_tpc, abs_old).pvalue:.3e}   (for reference)")
 print(f"  BAT original vs BAT new: p = {wilcoxon(abs_old, abs_new).pvalue:.3e}   (did the checkpoint change accuracy?)")
 
-# ---------------------------------------------------------------------------
+
 # 6. Per disease group: MAE, Wilcoxon and dangerous-case rate.
-#    Same merge and test as significance_test_by_phenotype_fixed.py.
-# ---------------------------------------------------------------------------
+
 groups_done = False
 if os.path.exists("bat_stay_id_order.csv") and os.path.exists("cohort_icd9_phenotype_mapping_with_fallback.csv"):
     stay_ids = pd.read_csv("bat_stay_id_order.csv")["stay_id"].iloc[bat_test_rows].values
@@ -171,9 +144,9 @@ else:
     print("\n(Per disease group skipped: bat_stay_id_order.csv or "
           "cohort_icd9_phenotype_mapping_with_fallback.csv not found in this folder.)")
 
-# ---------------------------------------------------------------------------
-# 7. Did the main findings hold? Plain yes/no, no interpretation.
-# ---------------------------------------------------------------------------
+
+# 7. Did the main findings hold? 
+
 e_tpc, e_new = errors["TPC (fixed)"], errors["BAT new (IV+eICU)"]
 print("\n=== Do the original findings still hold with the new checkpoint? ===")
 print(f"  BAT still has lower MAE than TPC:                 {np.abs(e_new).mean() < np.abs(e_tpc).mean()}")
@@ -184,10 +157,9 @@ print(f"  ...and at every threshold from -1 to -5:          {all((e_new <= t).su
 print(f"  BAT still has higher AUROC and AUPRC:             "
       f"{roc_auc_score(true_binary, new_preds) > roc_auc_score(true_binary, tpc_preds) and average_precision_score(true_binary, new_preds) > average_precision_score(true_binary, tpc_preds)}")
 
-# ---------------------------------------------------------------------------
-# 8. Save, same naming pattern as before plus _ivEicu, so the downstream
-#    scripts (feature importance, SOFA alignment) can swap these in later.
-# ---------------------------------------------------------------------------
+
+
+# 8. Save
 np.save(f"bat_error{TAG}.npy", e_new)
 np.save(f"bat_dangerous_mask{TAG}.npy", e_new <= -3.0)
 for t in thresholds:

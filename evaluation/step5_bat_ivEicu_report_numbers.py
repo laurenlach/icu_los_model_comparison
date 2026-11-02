@@ -1,24 +1,7 @@
-"""
-Step 5 of the BAT re-run: recompute every BAT number in the report (Draft 4)
-for the NEW BAT (MIMIC-IV + eICU checkpoint), using the same formulas as the
-report's methodology. TPC is computed alongside from its saved SHAP file, so you
-can check that TPC's column still matches the report exactly. That proves the
-formulas are the same ones the report used.
 
-Run from your YAIB folder:
-    python step5_bat_ivEicu_report_numbers.py
+#recompute every BAT number in the report 
 
-Files needed in the YAIB folder:
-    bat_test_predictions_ivEicu.npy, tpc_test_predictions_fixed.npy, tpc_test_targets_fixed.npy,
-    bat_test_rows.npy, bat_stay_id_order.csv,
-    bat_ig_values_full_testset_healthybaseline_ivEicu.npy,
-    bat_ig_convergence_deltas_healthybaseline_ivEicu.npy,
-    bat_ig_full_testset_stay_ids_healthybaseline_ivEicu.csv,
-    tpc_shap_values_full_testset_fixed.npy,
-    sofa_24h_scores.csv, cohort_icd9_phenotype_mapping_with_fallback.csv
 
-Nothing is overwritten. Every file it saves ends in _ivEicu.
-"""
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -36,9 +19,8 @@ ORGAN_LABEL = {"sofa_cardio_comp": "Cardiovascular", "sofa_renal_comp": "Renal",
                "sofa_liver_comp": "Liver", "sofa_coag_comp": "Coagulation",
                "sofa_resp_comp": "Respiratory"}
 
-# ---------------------------------------------------------------------------
-# 0. Load and check alignment. Why: every number below pairs rows across files.
-# ---------------------------------------------------------------------------
+
+# 0. Load and check alignment
 bat_p = np.load(f"bat_test_predictions{TAG}.npy").ravel().astype(np.float64)
 tpc_p = np.load("tpc_test_predictions_fixed.npy").ravel().astype(np.float64)
 y = np.load("tpc_test_targets_fixed.npy").ravel().astype(np.float64)
@@ -65,17 +47,15 @@ if not all(checks.values()):
 
 e_bat, e_tpc = bat_p - y, tpc_p - y
 
-# ---------------------------------------------------------------------------
-# 1. Section IV-B text and Discussion: paired comparison
-# ---------------------------------------------------------------------------
+
+# 1.paired comparison
 print("\n=== Paired comparison (Section IV-B, Discussion) ===")
 print(f"  BAT has the lower absolute error on {int((np.abs(e_bat) < np.abs(e_tpc)).sum())} of 10367 stays   [report: 6 465]")
 print(f"  MAE advantage:  {np.abs(e_tpc).mean() - np.abs(e_bat).mean():.3f} days   [report: 0.454]")
 print(f"  RMSE advantage: {np.sqrt((e_tpc**2).mean()) - np.sqrt((e_bat**2).mean()):.3f} days   [report: 0.146]")
 
-# ---------------------------------------------------------------------------
-# 2. Table IV: SOFA importance share (Equation 6) and temporal entropy
-# ---------------------------------------------------------------------------
+
+# 2. SOFA importance share and temporal entropy
 def sofa_share(imp):
     pooled = 100 * imp[:, SOFA_IDX].sum() / imp.sum()
     per = 100 * imp[:, SOFA_IDX].sum(axis=(1, 2)) / imp.sum(axis=(1, 2))
@@ -99,9 +79,9 @@ print(f"  BAT new is {sofa_share(bat_imp)[0] - 100 * 7 / 48:.1f} points above th
 print(f"  TPC hours with exactly zero importance: {int((tpc_imp.sum(axis=(0, 1)) == 0).sum())}   [report: 9, hours 0 to 8]")
 print(f"  Stays with IG convergence error above 0.1: {int(flagged.sum())} ({100 * flagged.mean():.2f}%)")
 
-# ---------------------------------------------------------------------------
-# 3. Table V: Spearman alignment per organ, plus the flagged-stays check
-# ---------------------------------------------------------------------------
+
+# 3. Spearman alignment per organ 
+
 sofa = pd.read_csv("sofa_24h_scores.csv").rename(columns={"icustay_id": "stay_id"})
 print("\n=== Table V ===")
 print(f"  {'Organ':<16}{'Stays':>8}{'TPC':>9}{'BAT new':>10}{'BAT excl. flagged':>20}")
@@ -124,11 +104,9 @@ print("  [report TPC: -0.343, 0.181, 0.740, 0.167, 0.058]")
 for organ in ORGANS:
     align_files[(organ, "BAT")].to_csv(f"alignment_{organ}_BAT_healthybaseline{TAG}.csv", index=False)
 
-# ---------------------------------------------------------------------------
+
 # 4. Comparative summary: mean alignment score per disease group
-#    (same method as phenotype_alignment_matrix_v2.py: Spearman per organ
-#     within the group if n >= 10, then the mean over organs)
-# ---------------------------------------------------------------------------
+
 pheno = pd.read_csv("cohort_icd9_phenotype_mapping_with_fallback.csv")
 rows = []
 for (organ, model), df in align_files.items():
@@ -142,9 +120,9 @@ print(grp.round(4).to_string())
 print(f"\n  BAT has the higher mean alignment score in {int(grp['BAT_higher'].sum())}/{len(grp)} groups   [report: 25/25]")
 grp.to_csv(f"phenotype_alignment_aggregate{TAG}.csv")
 
-# ---------------------------------------------------------------------------
-# 5. Figure 3 and Section IV-C: mean signed error by true length of stay
-# ---------------------------------------------------------------------------
+
+# 5. mean signed error by true length of stay
+
 edges = [0, 3, 5, 7, 10, 14, 20, np.inf]
 labels = ["0-3", "3-5", "5-7", "7-10", "10-14", "14-20", "20+"]
 bins = pd.cut(y, edges, labels=labels, right=False)
@@ -156,10 +134,9 @@ print(fig3.round(2).to_string())
 print("  [report: 0-3 n=6574, TPC +1.79, original BAT +0.82, gap 0.97; 20+ n=293, TPC -24.30, original BAT -24.20; 14-20 gap 0.04]")
 fig3.to_csv(f"figure3_error_by_true_los{TAG}.csv")
 
-# ---------------------------------------------------------------------------
-# 6. Figure 4: the two illustrative stays, located from the report's values
-#    (TPC 7.5 / true 7.6, and TPC 10.2 / true 9.2), then the new BAT's prediction
-# ---------------------------------------------------------------------------
+
+# 6. illustrative stays
+
 print("\n=== Figure 4: the two illustrative stays ===")
 for label, true_v, tpc_v in [("Both accurate", 7.6, 7.5), ("BAT under-predicts", 9.2, 10.2)]:
     cand = np.where((np.abs(y - true_v) < 0.05) & (np.abs(tpc_p - tpc_v) < 0.05))[0]
@@ -168,11 +145,9 @@ for label, true_v, tpc_v in [("Both accurate", 7.6, 7.5), ("BAT under-predicts",
               f"(BAT error {e_bat[i]:+.2f}, dangerous: {e_bat[i] <= -3})")
     if len(cand) == 0:
         print(f"  {label}: no stay matched, tell Claude")
+        
+# 7. mean importance and rank for all 48 variables
 
-# ---------------------------------------------------------------------------
-# 7. Appendix C: mean importance and rank for all 48 variables
-#    (mean of absolute importance over stays and hours)
-# ---------------------------------------------------------------------------
 app = pd.DataFrame({"variable": NAMES,
                     "TPC": tpc_imp.mean(axis=(0, 2)), "BAT_new": bat_imp.mean(axis=(0, 2))})
 app["TPC_rank"] = app["TPC"].rank(ascending=False, method="first").astype(int)

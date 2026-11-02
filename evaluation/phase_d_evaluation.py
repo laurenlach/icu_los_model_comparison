@@ -1,9 +1,8 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score, average_precision_score, precision_score
 
-# ---------------------------------------------------------------------------
+
 # 1. Load both models' predictions and true values
-# ---------------------------------------------------------------------------
 tpc_preds = np.load("tpc_test_predictions_200epoch.npy")
 tpc_targets = np.load("tpc_test_targets_200epoch.npy")
 
@@ -13,13 +12,9 @@ bat_targets = np.load("bat_test_targets.npy")
 print("TPC test set size:", len(tpc_preds))
 print("BAT test set size:", len(bat_preds))
 
-# ---------------------------------------------------------------------------
-# 2. PRIMARY ANALYSIS: continuous prediction error, per supervisor's guidance
-#    error = predicted - true (in days)
-#    Negative error = model UNDER-predicted (predicted shorter stay than
-#    actual) - this is the dangerous direction (premature discharge risk).
-#    Positive error = model OVER-predicted (predicted longer than actual).
-# ---------------------------------------------------------------------------
+
+# 2. PRIMARY ANALYSIS: continuous prediction error
+
 def error_analysis(preds, targets, model_name):
     error = preds - targets  # per-patient error, in days
     abs_error = np.abs(error)
@@ -40,13 +35,9 @@ def error_analysis(preds, targets, model_name):
 tpc_error, tpc_abs_error = error_analysis(tpc_preds, tpc_targets, "TPC")
 bat_error, bat_abs_error = error_analysis(bat_preds, bat_targets, "BAT")
 
-# ---------------------------------------------------------------------------
-# 3. Identify DANGEROUS cases: large negative error (model predicted much
-#    shorter stay than actual - the premature-discharge risk scenario).
-#    Using a threshold of -3 days as a starting point (patient stayed at
-#    least 3 days longer than predicted) - this threshold is a judgment
-#    call and can be adjusted/justified further in the write-up.
-# ---------------------------------------------------------------------------
+
+# 3. Identify DANGEROUS cases
+
 def dangerous_case_analysis(error, targets, model_name, threshold=-3.0):
     dangerous_mask = error <= threshold
     n_dangerous = dangerous_mask.sum()
@@ -63,11 +54,9 @@ def dangerous_case_analysis(error, targets, model_name, threshold=-3.0):
 tpc_dangerous = dangerous_case_analysis(tpc_error, tpc_targets, "TPC")
 bat_dangerous = dangerous_case_analysis(bat_error, bat_targets, "BAT")
 
-# ---------------------------------------------------------------------------
-# 4. SECONDARY ANALYSIS: 7-day cutoff binary classification (from the
-#    original proposal) - kept as supplementary, not primary, per
-#    supervisor's updated guidance.
-# ---------------------------------------------------------------------------
+
+# 4. SECONDARY ANALYSIS: 7-day cutoff binary classification 
+
 def binary_cutoff_analysis(preds, targets, model_name, cutoff=7.0):
     true_binary = (targets >= cutoff).astype(int)
     pred_binary = (preds >= cutoff).astype(int)
@@ -90,10 +79,9 @@ def binary_cutoff_analysis(preds, targets, model_name, cutoff=7.0):
 tpc_true_bin, tpc_pred_bin = binary_cutoff_analysis(tpc_preds, tpc_targets, "TPC")
 bat_true_bin, bat_pred_bin = binary_cutoff_analysis(bat_preds, bat_targets, "BAT")
 
-# ---------------------------------------------------------------------------
-# 5. Save everything needed for Phase E/F - per-patient errors, dangerous
-#    case flags, and binary labels, for both models.
-# ---------------------------------------------------------------------------
+
+# 5. Save 
+
 np.save("tpc_error.npy", tpc_error)
 np.save("tpc_dangerous_mask.npy", tpc_dangerous)
 np.save("bat_error.npy", bat_error)

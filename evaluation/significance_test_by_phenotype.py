@@ -2,10 +2,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 
-# ---------------------------------------------------------------------------
-# 1. Load errors and verify TPC/BAT test rows are genuinely identical
-#    (expected, since TPC reuses BAT's split arrays - but verify, don't assume)
-# ---------------------------------------------------------------------------
 tpc_error = np.load("tpc_error.npy")
 bat_error = np.load("bat_error.npy")
 tpc_test_rows = np.load("tpc_test_rows.npy")
@@ -19,17 +15,13 @@ assert np.array_equal(tpc_test_rows, bat_test_rows), (
 print(f"Confirmed: TPC and BAT test_rows are identical ({len(tpc_test_rows)} patients) - "
       f"safe to compare tpc_error.npy and bat_error.npy by row position.")
 
-# ---------------------------------------------------------------------------
-# 2. Get stay_id for each row (same order as test_rows, via BAT's stay_id order)
-# ---------------------------------------------------------------------------
+
 stay_id_order = pd.read_csv("bat_stay_id_order.csv")
 row_stay_ids = stay_id_order["stay_id"].iloc[bat_test_rows].values
 
 assert len(row_stay_ids) == len(tpc_error), "Stay ID count mismatch - stop and investigate."
 
-# ---------------------------------------------------------------------------
-# 3. Load phenotype mapping and merge everything into one table
-# ---------------------------------------------------------------------------
+
 phenotype_map = pd.read_csv("cohort_icd9_phenotype_mapping_with_fallback.csv")
 
 df = pd.DataFrame({
@@ -45,13 +37,7 @@ print(f"\nPatients matched to a phenotype: {len(df) - n_unmatched} / {len(df)} "
 
 df = df.dropna(subset=["phenotype"])
 
-# ---------------------------------------------------------------------------
-# 4. Paired Wilcoxon signed-rank test per phenotype
-#    Paired because it's the SAME patients under both models, not independent
-#    groups - Wilcoxon (not a paired t-test) because absolute errors are
-#    unlikely to be normally distributed (long right tail of very sick,
-#    long-stay patients).
-# ---------------------------------------------------------------------------
+
 results = []
 for phenotype, group in df.groupby("phenotype"):
     n = len(group)

@@ -1,19 +1,16 @@
 import numpy as np
 from sklearn.metrics import roc_auc_score, average_precision_score, precision_score
 
-# ---------------------------------------------------------------------------
-# 1. Load FIXED TPC's predictions and true values (BAT is unaffected by
-#    the fix, so BAT's existing results are reused as-is, not recomputed)
-# ---------------------------------------------------------------------------
+
+# 1. Load TPC's predictions and true values 
 tpc_preds = np.load("tpc_test_predictions_fixed.npy")
 tpc_targets = np.load("tpc_test_targets_fixed.npy")
 
 print("TPC (fixed) test set size:", len(tpc_preds))
 
-# ---------------------------------------------------------------------------
-# 2. PRIMARY ANALYSIS: continuous prediction error (identical logic to the
-#    original phase_d_evaluation.py)
-# ---------------------------------------------------------------------------
+
+# 2. PRIMARY ANALYSIS: continuous prediction error 
+
 def error_analysis(preds, targets, model_name):
     error = preds - targets
     abs_error = np.abs(error)
@@ -33,9 +30,8 @@ def error_analysis(preds, targets, model_name):
 
 tpc_error, tpc_abs_error = error_analysis(tpc_preds, tpc_targets, "TPC (fixed)")
 
-# ---------------------------------------------------------------------------
-# 3. Dangerous case analysis - identical threshold (-3.0), same logic
-# ---------------------------------------------------------------------------
+
+# 3. Dangerous case analysis - identical threshold (-3.0)
 def dangerous_case_analysis(error, targets, model_name, threshold=-3.0):
     dangerous_mask = error <= threshold
     n_dangerous = dangerous_mask.sum()
@@ -51,9 +47,9 @@ def dangerous_case_analysis(error, targets, model_name, threshold=-3.0):
 
 tpc_dangerous = dangerous_case_analysis(tpc_error, tpc_targets, "TPC (fixed)")
 
-# ---------------------------------------------------------------------------
+
 # 4. SECONDARY: binary 7-day cutoff, identical logic
-# ---------------------------------------------------------------------------
+
 def binary_cutoff_analysis(preds, targets, model_name, cutoff=7.0):
     true_binary = (targets >= cutoff).astype(int)
     pred_binary = (preds >= cutoff).astype(int)
@@ -71,11 +67,9 @@ def binary_cutoff_analysis(preds, targets, model_name, cutoff=7.0):
 
 binary_cutoff_analysis(tpc_preds, tpc_targets, "TPC (fixed)")
 
-# ---------------------------------------------------------------------------
-# 5. Save - matching the naming pattern needed by downstream scripts
-#    (significance test, reliability matrix), so they can just swap in
-#    these files in place of the old ones
-# ---------------------------------------------------------------------------
+
+# 5. Save 
+
 np.save("tpc_error_fixed.npy", tpc_error)
 np.save("tpc_dangerous_mask_fixed.npy", tpc_dangerous)
 np.save("tpc_dangerous_mask_threshold_3_0days_fixed.npy", tpc_dangerous)

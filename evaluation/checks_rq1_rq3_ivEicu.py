@@ -1,22 +1,9 @@
-"""
-Two quick checks after the BAT re-run (no GPU, runs on your laptop).
 
-CHECK 1 (RQ1): the Discussion says TPC is safer because, for stays of about a
-week, TPC's predictions start ABOVE the true length (a buffer), while BAT's
-start close to it, so a small miss pushes BAT past the 3-day line.
-Is that still true with the new BAT?
+# Checks after the BAT re-run on the MIMIC-IV + eICU checkpoint.
+# 1. Does TPC still have a safety buffer on stays of about a week that BAT lacks?
+# 2. Which disease groups changed in how often TPC has fewer dangerous cases?
+# Run from the YAIB folder. Saves two new _ivEicu CSV files.
 
-CHECK 2 (RQ3): with the new BAT, TPC has fewer dangerous cases in 20 of 25
-disease groups instead of 24. Which groups flipped, by how many stays, and why?
-
-Run from your YAIB folder:
-    python checks_rq1_rq3_ivEicu.py
-
-Files needed: tpc_test_predictions_fixed.npy, tpc_test_targets_fixed.npy,
-bat_test_predictions.npy, bat_test_predictions_ivEicu.npy, bat_test_rows.npy,
-bat_stay_id_order.csv, cohort_icd9_phenotype_mapping_with_fallback.csv
-Nothing is saved or overwritten except two new _ivEicu CSV files.
-"""
 import numpy as np
 import pandas as pd
 
@@ -29,13 +16,8 @@ preds = {
 err = {k: p - y for k, p in preds.items()}
 assert all(len(v) == len(y) == 10367 for v in preds.values()), "STOP: wrong number of stays"
 
-# ---------------------------------------------------------------------------
-# CHECK 1: stays of about a week (5 to 10 days)
-# Why these measures: the Discussion's claim is about WHERE each model's
-# predictions sit relative to the truth for these stays, so we look at the
-# share predicted too long, the share in the "near miss" zone just short of
-# the 3-day line, and the share past it.
-# ---------------------------------------------------------------------------
+
+# CHECK 1
 week = (y >= 5) & (y < 10)
 print(f"=== CHECK 1: stays with true length 5 to 10 days (n = {week.sum()}) ===")
 rows = []
@@ -59,10 +41,9 @@ print(f"  New BAT has more dangerous than TPC:    "
       f"{c1.loc['BAT new', 'dangerous_count'] > c1.loc['TPC', 'dangerous_count']}")
 c1.to_csv("check_rq1_week_long_stays_ivEicu.csv")
 
-# ---------------------------------------------------------------------------
-# CHECK 2: dangerous cases per disease group, as COUNTS of stays.
-# Why counts: in small groups a rate difference can be one or two stays.
-# ---------------------------------------------------------------------------
+
+# CHECK 2
+
 test_rows = np.load("bat_test_rows.npy")
 stay_ids = pd.read_csv("bat_stay_id_order.csv")["stay_id"].values[test_rows]
 df = pd.DataFrame({"stay_id": stay_ids, "y": y,

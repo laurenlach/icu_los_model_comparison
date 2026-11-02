@@ -8,8 +8,8 @@ bat_pred = np.load("bat_test_predictions.npy").ravel().astype(float)
 bat_targ = np.load("bat_test_targets.npy").ravel().astype(float)
 
 # Both models were evaluated on the same stays in the same order, so the
-# errors are paired. Assert it rather than assume it, since a silent
-# mismatch here would invalidate the test without raising an error.
+# errors are paired.
+
 assert np.allclose(tpc_targ, bat_targ), "Targets differ - splits are not aligned."
 
 tpc_abs = np.abs(tpc_pred - tpc_targ)
