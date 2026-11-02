@@ -16,10 +16,9 @@ test_rows = np.load("tpc_test_rows.npy")
 print(f"Full dataset: {X.shape[0]} patients")
 print(f"Train: {len(train_rows)} | Val: {len(val_rows)} | Test: {len(test_rows)}")
 
-# ---------------------------------------------------------------------------
-# Quintile cutoffs computed ONLY from training data, to avoid any leakage
-# from val/test into the weighting scheme.
-# ---------------------------------------------------------------------------
+
+# Quintile cutoffs computed ONLY from training data
+
 y_train_raw = y[train_rows]
 cutoffs = np.quantile(y_train_raw, [0.2, 0.4, 0.6, 0.8])
 print(f"\nQuintile cutoffs (from train set): {cutoffs}")

@@ -5,9 +5,6 @@ from torch.utils.data import TensorDataset, DataLoader
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
-# 1. Load TPC's full data - all patients, real split
-# ---------------------------------------------------------------------------
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 y = np.load("tpc_y.npy")
@@ -35,9 +32,7 @@ train_loader = DataLoader(TensorDataset(*train_tensors), batch_size=batch_size, 
 val_loader = DataLoader(TensorDataset(*val_tensors), batch_size=batch_size)
 test_loader = DataLoader(TensorDataset(*test_tensors), batch_size=batch_size)
 
-# ---------------------------------------------------------------------------
-# 2. Build TPC (trained from scratch - no pretrained checkpoint, as expected)
-# ---------------------------------------------------------------------------
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -50,9 +45,7 @@ model = TPC(
 )
 print(f"\nTPC model built. Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
-# ---------------------------------------------------------------------------
-# 3. Full training loop with early stopping + best-model checkpointing
-# ---------------------------------------------------------------------------
+
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 loss_fn = torch.nn.MSELoss()
 
@@ -106,9 +99,7 @@ for epoch in range(max_epochs):
 
 log(f"\nTraining finished. Best val loss: {best_val_loss:.4f}")
 
-# ---------------------------------------------------------------------------
-# 4. Load the BEST model (not necessarily the last one) and evaluate on TEST
-# ---------------------------------------------------------------------------
+
 model.load_state_dict(torch.load("tpc_best_model.pt"))
 model.eval()
 
@@ -130,9 +121,7 @@ log(f"\n=== FINAL TEST SET RESULTS (TPC) ===")
 log(f"MAE: {mae:.4f} days")
 log(f"RMSE: {rmse:.4f} days")
 
-# ---------------------------------------------------------------------------
-# 5. Save predictions and log for later analysis (Phase D/E need these)
-# ---------------------------------------------------------------------------
+
 np.save("tpc_test_predictions.npy", all_preds.numpy())
 np.save("tpc_test_targets.npy", all_targets.numpy())
 

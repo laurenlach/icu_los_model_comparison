@@ -3,9 +3,6 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 from icu_benchmarks.models.dl_models.bat import BAT, RegressionHead
 
-# ---------------------------------------------------------------------------
-# 1. Load the FINAL, correct data: scaled, with real static/mask, real split
-# ---------------------------------------------------------------------------
 X = np.load("bat_X_scaled.npy")        # (51835, 24, 48) - Z-scored
 static = np.load("bat_static_scaled.npy")  # (51835, 4) - Z-scored
 mask = np.load("bat_mask.npy")         # (51835, 24, 48) - real observed indicator
@@ -17,11 +14,6 @@ val_rows = np.load("bat_val_rows.npy")
 print("Full data shapes:", X.shape, static.shape, mask.shape, y.shape)
 print("Train patients:", len(train_rows), "| Val patients:", len(val_rows))
 
-# ---------------------------------------------------------------------------
-# 2. For this debug run: use a manageable slice of the REAL train/val split
-#    (not the full 31k/10k - just enough to confirm everything works and
-#    the loss trends sensibly, in a reasonable amount of time on CPU)
-# ---------------------------------------------------------------------------
 n_train_debug = 2000
 n_val_debug = 500
 
@@ -49,9 +41,6 @@ val_tensors = build_tensors(val_idx)
 train_loader = DataLoader(TensorDataset(*train_tensors), batch_size=32, shuffle=True)
 val_loader = DataLoader(TensorDataset(*val_tensors), batch_size=32)
 
-# ---------------------------------------------------------------------------
-# 3. Rebuild the bridged model (pretrained encoder + fresh regression head)
-# ---------------------------------------------------------------------------
 ckpt = torch.load("pretrained_checkpoints/bat_pretrained.ckpt", map_location="cpu")
 encoder_weights = {
     k: v for k, v in ckpt["state_dict"].items()
@@ -75,9 +64,6 @@ print("\nPretrained encoder weights loaded.")
 print("Missing keys (expect only the new head):", result.missing_keys)
 print("Unexpected keys (expect empty):", result.unexpected_keys)
 
-# ---------------------------------------------------------------------------
-# 4. Real training loop, with validation loss tracked too
-# ---------------------------------------------------------------------------
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 loss_fn = torch.nn.MSELoss()
 

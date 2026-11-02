@@ -5,9 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
-# 1. Load TPC's full data - all patients, real split (same as before)
-# ---------------------------------------------------------------------------
+
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 y = np.load("tpc_y.npy")
@@ -35,9 +33,8 @@ train_loader = DataLoader(TensorDataset(*train_tensors), batch_size=batch_size, 
 val_loader = DataLoader(TensorDataset(*val_tensors), batch_size=batch_size)
 test_loader = DataLoader(TensorDataset(*test_tensors), batch_size=batch_size)
 
-# ---------------------------------------------------------------------------
-# 2. Build TPC (trained from scratch, same architecture as before)
-# ---------------------------------------------------------------------------
+
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -50,11 +47,7 @@ model = TPC(
 )
 print(f"\nTPC model built. Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
-# ---------------------------------------------------------------------------
-# 3. Full training loop - higher epoch cap this time (200, up from 100),
-#    same patience, to see if early stopping actually triggers naturally
-#    once the model has more room to fully converge.
-# ---------------------------------------------------------------------------
+
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 loss_fn = torch.nn.MSELoss()
 
@@ -108,9 +101,8 @@ for epoch in range(max_epochs):
 
 log(f"\nTraining finished. Best val loss: {best_val_loss:.4f}")
 
-# ---------------------------------------------------------------------------
-# 4. Load the BEST model and evaluate on TEST
-# ---------------------------------------------------------------------------
+
+
 model.load_state_dict(torch.load("tpc_best_model_200epoch.pt"))
 model.eval()
 
@@ -132,10 +124,6 @@ log(f"\n=== FINAL TEST SET RESULTS (TPC, 200-epoch run) ===")
 log(f"MAE: {mae:.4f} days")
 log(f"RMSE: {rmse:.4f} days")
 
-# ---------------------------------------------------------------------------
-# 5. Save predictions and log - DISTINCT filenames from the 100-epoch run,
-#    so both results are preserved for comparison.
-# ---------------------------------------------------------------------------
 np.save("tpc_test_predictions_200epoch.npy", all_preds.numpy())
 np.save("tpc_test_targets_200epoch.npy", all_targets.numpy())
 

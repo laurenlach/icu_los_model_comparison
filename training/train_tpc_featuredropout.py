@@ -5,9 +5,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
-# 1. Load TPC's full data - identical to train_tpc_fixed.py
-# ---------------------------------------------------------------------------
+
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 y = np.load("tpc_y.npy")
@@ -35,12 +33,7 @@ train_loader = DataLoader(TensorDataset(*train_tensors), batch_size=batch_size, 
 val_loader = DataLoader(TensorDataset(*val_tensors), batch_size=batch_size)
 test_loader = DataLoader(TensorDataset(*test_tensors), batch_size=batch_size)
 
-# ---------------------------------------------------------------------------
-# 2. The one addition: randomly zero whole sensors (all 24 hours) per patient,
-#    per training batch, so TPC can't rely on the same 2-3 sensors every time.
-#    Applied to training data only - val/test stay untouched, since we still
-#    want to measure real performance, not performance-under-dropout.
-# ---------------------------------------------------------------------------
+
 DROPOUT_FRACTION = 0.15  # fraction of the 48 sensors dropped per patient per batch
 
 def feature_dropout(x_batch, frac=DROPOUT_FRACTION):
@@ -48,9 +41,7 @@ def feature_dropout(x_batch, frac=DROPOUT_FRACTION):
     mask = (torch.rand(B, F) >= frac).float().unsqueeze(-1)  # (B, F, 1)
     return x_batch * mask
 
-# ---------------------------------------------------------------------------
-# 3. Build TPC - same architecture as the fixed model
-# ---------------------------------------------------------------------------
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -64,10 +55,7 @@ model = TPC(
 print(f"\nTPC model built (feature-dropout side experiment). Trainable parameters: "
       f"{sum(p.numel() for p in model.parameters() if p.requires_grad)}")
 
-# ---------------------------------------------------------------------------
-# 4. Full training loop - identical settings to train_tpc_fixed.py,
-#    except feature_dropout() is applied to each training batch
-# ---------------------------------------------------------------------------
+
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 loss_fn = torch.nn.MSELoss()
 
@@ -122,9 +110,7 @@ for epoch in range(max_epochs):
 
 log(f"\nTraining finished. Best val loss: {best_val_loss:.4f}")
 
-# ---------------------------------------------------------------------------
-# 5. Load the BEST model and evaluate on TEST (no dropout at test time)
-# ---------------------------------------------------------------------------
+
 model.load_state_dict(torch.load("tpc_best_model_featuredropout.pt"))
 model.eval()
 

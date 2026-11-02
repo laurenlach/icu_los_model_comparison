@@ -3,31 +3,24 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader, random_split
 from icu_benchmarks.models.dl_models.bat import BAT, RegressionHead
 
-# ---------------------------------------------------------------------------
-# 1. Load our prepared data
-# ---------------------------------------------------------------------------
+
 X = np.load("bat_X.npy")   # shape: (51835, 24, 48)
 y = np.load("bat_y.npy")   # shape: (51835,)
 
 print("X shape:", X.shape, "| y shape:", y.shape)
 
-# For this debug run, use a small subset - just to confirm everything runs
+
 n_debug = 500
 X_debug = X[:n_debug]
 y_debug = y[:n_debug]
 
-# BAT expects (batch, sensors, timepoints) - our data is (batch, timepoints, sensors)
-# so we need to transpose the last two dimensions
+
 X_debug = np.transpose(X_debug, (0, 2, 1))  # -> (n_debug, 48, 24)
 print("X_debug shape after transpose:", X_debug.shape)
 
 X_tensor = torch.tensor(X_debug, dtype=torch.float32)
 y_tensor = torch.tensor(y_debug, dtype=torch.float32)
 
-# BAT also needs static, time, and sensor_mask inputs - build simple placeholders for now
-# static_tensor = torch.zeros((n_debug, 4), dtype=torch.float32)          # 4 static features
-# time_tensor = torch.arange(24, dtype=torch.float32).repeat(n_debug, 1)  # hour index 0-23
-# mask_tensor = torch.ones((n_debug, 48, 24), dtype=torch.float32)        # all values "observed"
 static_full = np.load("bat_static.npy")
 mask_full = np.load("bat_mask.npy")
 
@@ -46,9 +39,7 @@ train_set, val_set = random_split(dataset, [train_len, n_debug - train_len])
 train_loader = DataLoader(train_set, batch_size=16, shuffle=True)
 val_loader = DataLoader(val_set, batch_size=16)
 
-# ---------------------------------------------------------------------------
-# 2. Rebuild the bridged model (same as bridge_bat_checkpoint.py)
-# ---------------------------------------------------------------------------
+
 ckpt = torch.load("pretrained_checkpoints/bat_pretrained.ckpt", map_location="cpu")
 encoder_weights = {
     k: v for k, v in ckpt["state_dict"].items()
@@ -70,9 +61,7 @@ model = BAT(
 model.load_state_dict(encoder_weights, strict=False)
 print("Pretrained encoder weights loaded.")
 
-# ---------------------------------------------------------------------------
-# 3. Tiny training loop - just a couple epochs, to confirm it runs end-to-end
-# ---------------------------------------------------------------------------
+
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 loss_fn = torch.nn.MSELoss()
 

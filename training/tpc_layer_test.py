@@ -2,16 +2,11 @@ import torch
 import torch.nn as nn
 from icu_benchmarks.models.dl_models.layers import Chomp1d
 
-# ---------------------------------------------------------------------------
-# Dummy data matching our real shapes: batch of 8, 48 sensors, 24 timesteps
-# ---------------------------------------------------------------------------
+# Dummy data matching our real shapes
 B, F, T = 8, 48, 24
 X = torch.randn(B, F, T)  # channels-first, as Conv1d expects
 print("Input X shape:", X.shape)
 
-# ---------------------------------------------------------------------------
-# One TPC "layer" = temporal conv (per-sensor, causal) + pointwise linear
-# ---------------------------------------------------------------------------
 kernel_size = 3
 temp_kernels = 4   # how many output channels PER SENSOR the temporal conv produces
 point_size = 8     # how many output features the pointwise layer produces
@@ -19,8 +14,7 @@ point_size = 8     # how many output features the pointwise layer produces
 dilation = 1
 padding = (kernel_size - 1) * dilation  # causal padding amount
 
-# Temporal conv: groups=F means each of the 48 sensors gets its own
-# independent set of filters - they never mix with each other here.
+
 temp_conv = nn.Conv1d(
     in_channels=F,
     out_channels=F * temp_kernels,   # each sensor produces temp_kernels outputs
@@ -34,10 +28,7 @@ chomp = Chomp1d(padding)  # trims the extra padding so output stays causal
 temp_out = chomp(temp_conv(X))
 print("Temporal conv output shape (expect (B, F*temp_kernels, T)):", temp_out.shape)
 
-# ---------------------------------------------------------------------------
-# Pointwise layer: looks across ALL sensors at a single timestep.
-# Needs input reshaped so "features" is the last dimension for nn.Linear.
-# ---------------------------------------------------------------------------
+
 X_for_pointwise = X.permute(0, 2, 1).reshape(B * T, F)  # (B*T, F)
 pointwise = nn.Linear(F, point_size)
 point_out = pointwise(X_for_pointwise)
