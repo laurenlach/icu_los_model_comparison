@@ -13,10 +13,6 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# ---------------------------------------------------------------------------
-# 1. Load the saved test-set predictions and targets.
-#    TPC uses the FIXED model files. Do NOT use the _200epoch (pre-fix) ones.
-# ---------------------------------------------------------------------------
 tpc_pred = np.load("tpc_test_predictions_fixed.npy").ravel()
 tpc_true = np.load("tpc_test_targets_fixed.npy").ravel()
 bat_pred = np.load("bat_test_predictions.npy").ravel()
@@ -29,9 +25,6 @@ tpc_err = tpc_pred - tpc_true
 bat_err = bat_pred - bat_true
 true_los = tpc_true
 
-# ---------------------------------------------------------------------------
-# 2. Bucket by true length of stay, average the signed error in each.
-# ---------------------------------------------------------------------------
 edges = [0, 3, 5, 7, 10, 14, 20, np.inf]
 labels = ["0-3", "3-5", "5-7", "7-10", "10-14", "14-20", "20+"]
 
@@ -52,9 +45,6 @@ bat_means = np.array(bat_means)
 
 ZOOM = slice(2, 6)   # 5-7, 7-10, 10-14, 14-20: where the curves overlap
 
-# ---------------------------------------------------------------------------
-# 3. Two stacked panels, sized for one IEEE column.
-# ---------------------------------------------------------------------------
 plt.rcParams.update({"font.size": 8, "font.family": "serif"})
 fig, (ax, axz) = plt.subplots(
     2, 1, figsize=(3.4, 4.2), gridspec_kw={"height_ratios": [1.35, 1]}

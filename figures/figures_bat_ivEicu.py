@@ -1,18 +1,4 @@
-"""
-Regenerate Figures 2, 3 and 4 of the report with the NEW BAT
-(MIMIC-IV + eICU checkpoint). Same layout and style as Draft 4.
 
-Run from your YAIB folder:
-    python figures_bat_ivEicu.py
-
-Files needed: tpc_test_predictions_fixed.npy, tpc_test_targets_fixed.npy,
-bat_test_predictions_ivEicu.npy, bat_test_rows.npy, bat_stay_id_order.csv,
-cohort_icd9_phenotype_mapping_with_fallback.csv
-
-Saves (PDF for Overleaf, PNG to look at), all ending in _ivEicu:
-    fig2_mae_by_group_ivEicu, fig2b_dangerous_by_group_ivEicu, fig3_error_vs_los_ivEicu, fig4_example_stays_ivEicu
-Nothing existing is overwritten.
-"""
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -22,9 +8,7 @@ import matplotlib.pyplot as plt
 TAG = "_ivEicu"
 TPC_COLOUR, BAT_COLOUR = "#1f77b4", "#d62728"
 
-# ---------------------------------------------------------------------------
-# Load and check. Why: every figure pairs the two models stay by stay.
-# ---------------------------------------------------------------------------
+
 y = np.load("tpc_test_targets_fixed.npy").ravel().astype(np.float64)
 tpc = np.load("tpc_test_predictions_fixed.npy").ravel().astype(np.float64)
 bat = np.load(f"bat_test_predictions{TAG}.npy").ravel().astype(np.float64)
@@ -42,9 +26,8 @@ def size_key(ax):
     ax.legend(handles, ["100", "500", "1000"], title="stays", loc="upper left", frameon=False,
               fontsize=5, title_fontsize=5, labelspacing=0.9, borderpad=0.6, handletextpad=1.2)
 
-# ===========================================================================
-# FIGURE 2: MAE per disease group, BAT against TPC
-# ===========================================================================
+
+# MAE per disease group, BAT against TPC
 df = pd.DataFrame({"stay_id": stay_ids, "tpc": np.abs(e_tpc), "bat": np.abs(e_bat)})
 df = df.merge(pd.read_csv("cohort_icd9_phenotype_mapping_with_fallback.csv"),
               on="stay_id", how="inner").dropna(subset=["phenotype"])
@@ -68,11 +51,11 @@ fig.savefig(f"fig2_mae_by_group{TAG}.pdf", bbox_inches="tight")
 fig.savefig(f"fig2_mae_by_group{TAG}.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ---------------------------------------------------------------------------
-# FIGURE 2(b): dangerous-case rate D(-3) per disease group, BAT against TPC.
+
+# dangerous-case rate D(-3) per disease group, BAT against TPC.
 # Same style as the MAE panel. Points ABOVE the line are groups where BAT
 # under-predicts by 3+ days more often than TPC.
-# ---------------------------------------------------------------------------
+
 dd = pd.DataFrame({"stay_id": stay_ids, "tpc": e_tpc <= -3, "bat": e_bat <= -3})
 dd = dd.merge(pd.read_csv("cohort_icd9_phenotype_mapping_with_fallback.csv"),
               on="stay_id", how="inner").dropna(subset=["phenotype"])
@@ -97,9 +80,8 @@ fig.savefig(f"fig2b_dangerous_by_group{TAG}.pdf", bbox_inches="tight")
 fig.savefig(f"fig2b_dangerous_by_group{TAG}.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ===========================================================================
-# FIGURE 3: mean signed error against true length of stay
-# ===========================================================================
+#  mean signed error against true length of stay
+
 edges = [0, 3, 5, 7, 10, 14, 20, np.inf]
 labels = ["0-3", "3-5", "5-7", "7-10", "10-14", "14-20", "20+"]
 tpc_m, bat_m = [], []
@@ -127,9 +109,8 @@ fig.savefig(f"fig3_error_vs_los{TAG}.pdf", bbox_inches="tight")
 fig.savefig(f"fig3_error_vs_los{TAG}.png", dpi=300, bbox_inches="tight")
 plt.close(fig)
 
-# ===========================================================================
-# FIGURE 4: the two illustrative stays from Draft 4, with the new BAT
-# ===========================================================================
+# illustrative stays 
+
 examples = [(284464, "Both models accurate"), (271079, "BAT under-predicts")]
 plt.rcParams.update({"font.family": "sans-serif", "font.size": 5.5})
 fig, axes = plt.subplots(1, 2, figsize=(4.0, 1.5))
