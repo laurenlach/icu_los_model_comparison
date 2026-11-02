@@ -27,8 +27,7 @@ for organ, sensor_idx in ORGAN_SENSOR_MAP.items():
     rho, p = spearmanr(df[organ], df["attribution"])
     results.append({"organ": organ, "n": len(df), "tpc_fixed_rho": rho, "p": p})
 
-    # Save per-organ alignment file, matching the naming pattern used for
-    # the reliability matrix / phenotype_alignment_matrix.py downstream
+    # Save per-organ alignment file
     out_df = df[["stay_id", organ, "attribution"]].rename(columns={"attribution": "attribution_mass"})
     out_df.to_csv(f"alignment_{organ}_TPC_fixed.csv", index=False)
 

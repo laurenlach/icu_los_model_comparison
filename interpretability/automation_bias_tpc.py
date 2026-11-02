@@ -5,9 +5,8 @@ import shap
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
-# 1. Load the trained TPC model (identical to shap_tpc_full_testset.py)
-# ---------------------------------------------------------------------------
+
+# 1. Load the trained TPC model 
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -22,9 +21,8 @@ model.load_state_dict(torch.load("tpc_best_model_200epoch.pt", map_location="cpu
 model.eval()
 print("Trained TPC model loaded successfully.")
 
-# ---------------------------------------------------------------------------
 # 2. Load data
-# ---------------------------------------------------------------------------
+
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 train_rows = np.load("tpc_train_rows.npy")
@@ -45,10 +43,9 @@ class TPCWrapperSingleStatic(torch.nn.Module):
         static_repeated = self.static_value.repeat(batch_size, 1)
         return self.model(x, static_repeated)
 
-# ---------------------------------------------------------------------------
-# 3. Subsample 200 test patients - same size as BAT's check, same seed
-#    logic, for a fair apples-to-apples comparison
-# ---------------------------------------------------------------------------
+
+# 3. Subsample 200 test patients
+
 n_sample = 200
 sample_rows = np.random.choice(test_rows, size=n_sample, replace=False)
 

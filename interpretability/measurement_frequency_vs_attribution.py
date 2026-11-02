@@ -10,27 +10,25 @@ feature_names = [
     "po2", "ptt", "resp", "sbp", "temp", "tnt", "urine", "wbc"
 ]
 
-# ---------------------------------------------------------------------------
-# 1. Observed-rate per feature (already computed once, redo cleanly here so
-#    this script stands alone)
-# ---------------------------------------------------------------------------
+
+# 1. Observed-rate per feature 
 mask = np.load("bat_mask.npy")
 test_rows = np.load("bat_test_rows.npy")
 mask_test = mask[test_rows]
 observed_pct = mask_test.mean(axis=(0, 1)) * 100  # % observed, per feature
 
-# ---------------------------------------------------------------------------
-# 2. Load attribution importance (final, healthy-baseline version for BAT)
-# ---------------------------------------------------------------------------
+
+# 2. Load attribution importance 
+
 importance_df = pd.read_csv("feature_importance_comparison_healthybaseline.csv")
 importance_df = importance_df.set_index("feature").loc[feature_names].reset_index()
 
 tpc_importance = importance_df["tpc_shap_importance"].values
 bat_importance = importance_df["bat_ig_importance_healthybaseline"].values
 
-# ---------------------------------------------------------------------------
+
 # 3. Correlate observed-rate against attribution, for each model
-# ---------------------------------------------------------------------------
+
 rho_tpc, p_tpc = spearmanr(observed_pct, tpc_importance)
 rho_bat, p_bat = spearmanr(observed_pct, bat_importance)
 
@@ -49,9 +47,9 @@ interpretation = (
 )
 print(f"BAT direction: {interpretation}")
 
-# ---------------------------------------------------------------------------
+
 # 4. Show the full table so specific features can be checked directly
-# ---------------------------------------------------------------------------
+
 results_df = pd.DataFrame({
     "feature": feature_names,
     "observed_pct": observed_pct,

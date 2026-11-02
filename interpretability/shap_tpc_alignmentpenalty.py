@@ -25,7 +25,7 @@ static = np.load("tpc_static_scaled.npy")
 train_rows = np.load("tpc_train_rows.npy")
 test_rows = np.load("tpc_test_rows.npy")
 
-# Same pattern as your original TPC SHAP setup: fix one patient's static values via a wrapper
+
 class TPCWrapperSingleStatic(torch.nn.Module):
     def __init__(self, model, static_vec):
         super().__init__()
@@ -39,8 +39,7 @@ rng = np.random.default_rng(0)
 background_idx = rng.choice(train_rows, size=50, replace=False)
 background = torch.tensor(X[background_idx], dtype=torch.float32)
 
-# Sample 1000 test patients (not the full 10,367) -- this is a verification check,
-# not a full re-run, so a solid sample is enough to confirm the pattern holds
+
 sample_idx = rng.choice(test_rows, size=1000, replace=False)
 
 all_shap = []

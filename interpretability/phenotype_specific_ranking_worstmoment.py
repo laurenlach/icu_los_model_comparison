@@ -46,7 +46,7 @@ def worst_moment_attribution(attr_array, X_raw_array, ids_df, model_name, top_n=
 
 # ---------------------------------------------------------------------------
 # TPC
-# ---------------------------------------------------------------------------
+
 tpc_shap = np.load("tpc_shap_values_full_testset.npy").squeeze(-1)   # (10367, 48, 24)
 tpc_ids = pd.read_csv("tpc_shap_full_testset_stay_ids.csv")
 tpc_X = np.load("tpc_X_scaled.npy")           # (51835, 48, 24)
@@ -57,7 +57,7 @@ tpc_phenotype_top = worst_moment_attribution(tpc_shap, tpc_X_test, tpc_ids, "TPC
 
 # ---------------------------------------------------------------------------
 # BAT
-# ---------------------------------------------------------------------------
+
 bat_ig = np.load("bat_ig_values_full_testset_healthybaseline.npy")   # (10367, 48, 24)
 bat_ids = pd.read_csv("bat_ig_full_testset_stay_ids_healthybaseline.csv")
 bat_X = np.load("bat_X_scaled.npy")           # (51835, 24, 48)
@@ -75,9 +75,9 @@ print(combined.to_string(index=False))
 combined.to_csv("phenotype_specific_feature_ranking_worstmoment.csv", index=False)
 print("\nSaved: phenotype_specific_feature_ranking_worstmoment.csv")
 
-# ---------------------------------------------------------------------------
-# Same face-validity check as before, for direct comparison
-# ---------------------------------------------------------------------------
+
+
+
 EXPECTED = {
     "Acute and unspecified renal failure": ["crea", "bun"],
     "Other liver diseases": ["bili", "bili_dir"],

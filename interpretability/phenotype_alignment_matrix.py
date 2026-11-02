@@ -8,7 +8,7 @@ MODELS = ["TPC", "BAT"]
 
 phenotype_map = pd.read_csv("cohort_icd9_phenotype_mapping_with_fallback.csv")
 
-# --- Step 1: per-organ, per-model, per-phenotype correlation ---
+# 1: per-organ, per-model, per-phenotype correlation 
 detailed_rows = []
 
 for organ in ORGAN_COLS:
@@ -36,7 +36,7 @@ for organ in ORGAN_COLS:
 detailed = pd.DataFrame(detailed_rows)
 detailed.to_csv("phenotype_organ_alignment_detailed.csv", index=False)
 
-# --- Step 2: aggregate across organ systems -> one alignment score per phenotype/model ---
+# 2: aggregate across organ systems -> one alignment score per phenotype/model 
 aggregate = (
     detailed.groupby(["phenotype", "model"])
     .agg(

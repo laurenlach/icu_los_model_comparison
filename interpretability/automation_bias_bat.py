@@ -3,9 +3,9 @@ import numpy as np
 from captum.attr import IntegratedGradients
 from icu_benchmarks.models.dl_models.bat import BAT, RegressionHead
 
-# ---------------------------------------------------------------------------
-# 1. Load the trained BAT model (identical to ig_bat_single_patient.py)
-# ---------------------------------------------------------------------------
+
+# 1. Load the trained BAT model 
+
 model = BAT(
     input_size=(64, 48, 24),
     value_embed_size=128,
@@ -22,27 +22,24 @@ model.load_state_dict(torch.load("bat_best_model.pt", map_location="cpu"))
 model.eval()
 print("Trained BAT model loaded successfully.")
 
-# ---------------------------------------------------------------------------
-# 2. Load test data and the NEW healthy baseline (Z-scored space)
-# ---------------------------------------------------------------------------
+
+# 2. Load test data and the healthy baseline 
+
 X = np.load("bat_X_scaled.npy")
 static = np.load("bat_static_scaled.npy")
 mask = np.load("bat_mask.npy")
 test_rows = np.load("bat_test_rows.npy")
 healthy_baseline = np.load("healthy_baseline_zscored.npy")  # shape (48,)
 
-# ---------------------------------------------------------------------------
-# 3. Pick a subsample of test patients (200) - fast enough to run quickly,
-#    large enough to draw a real conclusion from
-# ---------------------------------------------------------------------------
+
+# 3. Pick a subsample of test patients 
 np.random.seed(42)
 n_sample = 200
 sample_rows = np.random.choice(test_rows, size=n_sample, replace=False)
 
 ig = IntegratedGradients(model)
 
-# Noise level: 3% of each feature's Z-scored std (i.e. std=1, so noise_std=0.03)
-# - small enough to represent measurement noise, not a different patient
+
 NOISE_STD = 0.03
 
 pred_diffs = []

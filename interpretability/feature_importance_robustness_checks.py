@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# 1. Load the final feature-importance ranking (healthy baseline for BAT)
-# ---------------------------------------------------------------------------
+
+# 1. Load the final feature-importance ranking 
+
 importance_df = pd.read_csv("feature_importance_comparison_healthybaseline.csv")
 
 tpc_top10 = importance_df.sort_values("tpc_rank").head(10)["feature"].tolist()
@@ -12,13 +12,10 @@ bat_top10 = importance_df.sort_values("bat_rank_healthybaseline").head(10)["feat
 print("TPC top-10:", tpc_top10)
 print("BAT top-10:", bat_top10)
 
-# ---------------------------------------------------------------------------
+
 # 2. Correlated-feature critique: how correlated are each model's top-10
-#    features with EACH OTHER (using real patient data, not attribution)?
-#    We use bat_X_scaled.npy as the source of raw feature values, since both
-#    models share the same underlying 48 features and the same patients -
-#    this is about the DATA's structure, not either model specifically.
-# ---------------------------------------------------------------------------
+#    features with each other OTHER 
+
 feature_names = [
     "alb", "alp", "alt", "ast", "be", "bicar", "bili", "bili_dir", "bnd", "bun",
     "ca", "cai", "ck", "ckmb", "cl", "crea", "crp", "dbp", "fgn", "fio2",
@@ -32,8 +29,8 @@ test_rows = np.load("bat_test_rows.npy")
 X_test = X[test_rows]                     # (10367, 24, 48)
 
 # Collapse to one value per patient per feature (mean across the 24h window),
-# so each patient contributes one row - a standard way to compute feature-to-
-# feature correlation independent of the time dimension
+# so each patient contributes one row 
+
 X_test_flat = X_test.mean(axis=1)         # (10367, 48)
 
 df_features = pd.DataFrame(X_test_flat, columns=feature_names)
@@ -61,11 +58,10 @@ def print_correlation_block(top10, model_name):
 tpc_corr, tpc_flagged = print_correlation_block(tpc_top10, "TPC")
 bat_corr, bat_flagged = print_correlation_block(bat_top10, "BAT")
 
-# ---------------------------------------------------------------------------
+
 # 3. Attribution entropy: does each model spread importance across many
-#    features, or concentrate on a few? Same normalized-entropy formula
-#    used for BAT's attention weights in Phase E.
-# ---------------------------------------------------------------------------
+#    features, or concentrate on a few? 
+
 def normalized_entropy(importance_values):
     p = importance_values / importance_values.sum()
     p = p[p > 0]  # avoid log(0)
@@ -84,9 +80,9 @@ print(f"\n=== Attribution concentration (normalized entropy, 0=concentrated, 1=u
 print(f"TPC (SHAP): {tpc_entropy:.4f}")
 print(f"BAT (IG, healthy baseline): {bat_entropy:.4f}")
 
-# ---------------------------------------------------------------------------
+
 # 4. Save results
-# ---------------------------------------------------------------------------
+
 results = {
     "tpc_top10_correlated_pairs": tpc_flagged,
     "bat_top10_correlated_pairs": bat_flagged,

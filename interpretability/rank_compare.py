@@ -3,18 +3,17 @@ import numpy as np
 tpc_shap = np.load("tpc_shap_values_full_testset.npy")
 bat_ig = np.load("bat_ig_values_full_testset.npy")
 
-# Squeeze TPC's trailing output-dim (10367, 48, 24, 1) -> (10367, 48, 24)
+
 tpc_shap = tpc_shap.squeeze(-1)
 
 print("TPC SHAP shape after squeeze:", tpc_shap.shape)
 print("BAT IG shape:", bat_ig.shape)
 
-# Mean |attribution| per feature, averaged over patients AND time
-# axis=(0,2) collapses patients (axis 0) and time (axis 2), leaving one value per feature
+
 tpc_feature_importance = np.abs(tpc_shap).mean(axis=(0, 2))  # shape: (48,)
 bat_feature_importance = np.abs(bat_ig).mean(axis=(0, 2))    # shape: (48,)
 
-# --- Fill this in once you've pulled the ordered list from build_bat_los_dataset.py ---
+
 feature_names = [f"feature_{i}" for i in range(48)]  # PLACEHOLDER — replace with real names
 # ----------------------------------------------------------------------------------
 

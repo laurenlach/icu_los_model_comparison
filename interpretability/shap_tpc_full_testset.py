@@ -6,9 +6,8 @@ import time
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
 # 1. Load the trained TPC model
-# ---------------------------------------------------------------------------
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -23,9 +22,9 @@ model.load_state_dict(torch.load("tpc_best_model_200epoch.pt", map_location="cpu
 model.eval()
 print("Trained TPC model loaded successfully.")
 
-# ---------------------------------------------------------------------------
+
 # 2. Load data
-# ---------------------------------------------------------------------------
+
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 train_rows = np.load("tpc_train_rows.npy")
@@ -50,11 +49,10 @@ class TPCWrapperSingleStatic(torch.nn.Module):
         static_repeated = self.static_value.repeat(batch_size, 1)
         return self.model(x, static_repeated)
 
-# ---------------------------------------------------------------------------
+
 # 3. Run SHAP for every test patient, with periodic progress updates and
-#    resilience - if one patient somehow fails, log it and continue rather
-#    than losing the whole run.
-# ---------------------------------------------------------------------------
+#    resilience 
+
 all_shap_values = []
 all_patient_stay_ids = []
 failed_rows = []
@@ -89,10 +87,9 @@ print(f"\nTotal time: {total_elapsed/60:.1f} minutes")
 print(f"Successfully explained: {len(all_shap_values)} / {len(test_rows)} patients")
 if failed_rows:
     print(f"Failed patients (rows): {failed_rows}")
-
-# ---------------------------------------------------------------------------
+    
 # 4. Stack and save results
-# ---------------------------------------------------------------------------
+
 all_shap_values = np.stack(all_shap_values)
 print("\nFinal SHAP values array shape:", all_shap_values.shape)
 

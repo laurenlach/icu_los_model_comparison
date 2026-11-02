@@ -13,12 +13,11 @@ ORGAN_SENSOR_MAP = {
 sofa = pd.read_csv("sofa_24h_scores.csv")
 sofa = sofa.rename(columns={"icustay_id": "stay_id"})
 
-# NEW: healthy-baseline BAT IG values, instead of the old all-zeros ones
+# healthy-baseline BAT IG values, instead of the old all-zeros ones
 bat_ig = np.load("bat_ig_values_full_testset_healthybaseline.npy")
 bat_ids = pd.read_csv("bat_ig_full_testset_stay_ids_healthybaseline.csv")
 
-# Error and dangerous-case masks are unchanged - these come from the model's
-# actual predictions, not from attribution, so the baseline change doesn't affect them
+# Error and dangerous-case masks are unchanged 
 bat_error = np.load("bat_error.npy")
 bat_dangerous = np.load("bat_dangerous_mask_threshold_3_0days.npy")
 

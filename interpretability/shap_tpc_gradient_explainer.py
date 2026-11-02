@@ -4,9 +4,9 @@ import shap
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
+
 # 1. Load the trained TPC model
-# ---------------------------------------------------------------------------
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -21,9 +21,8 @@ model.load_state_dict(torch.load("tpc_best_model_200epoch.pt", map_location="cpu
 model.eval()
 print("Trained TPC model loaded successfully.")
 
-# ---------------------------------------------------------------------------
-# 2. Load data - same background/explain setup as before
-# ---------------------------------------------------------------------------
+
+# 2. Load data 
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 train_rows = np.load("tpc_train_rows.npy")
@@ -37,9 +36,9 @@ explain_idx = test_rows[:5]
 X_explain = torch.tensor(X[explain_idx], dtype=torch.float32)
 static_explain = torch.tensor(static[explain_idx], dtype=torch.float32)
 
-# ---------------------------------------------------------------------------
-# 3. Same wrapper as before
-# ---------------------------------------------------------------------------
+
+# 3. Same wrapper 
+
 class TPCWrapperSingleStatic(torch.nn.Module):
     def __init__(self, model, static_value):
         super().__init__()
@@ -51,10 +50,9 @@ class TPCWrapperSingleStatic(torch.nn.Module):
         static_repeated = self.static_value.repeat(batch_size, 1)
         return self.model(x, static_repeated)
 
-# ---------------------------------------------------------------------------
-# 4. Try GradientExplainer instead of DeepExplainer - same single-patient
-#    test as before, to see if this method handles TPC's architecture.
-# ---------------------------------------------------------------------------
+
+# 4. Try GradientExplainer instead of DeepExplainer 
+
 patient_static = static_explain[0:1]
 wrapper = TPCWrapperSingleStatic(model, patient_static)
 
@@ -68,8 +66,7 @@ print("\nSHAP values computed successfully - no additivity error this time.")
 print("SHAP values shape:", np.array(shap_values).shape)
 print("(Expect something like (1, 48, 24, 1) - one value per sensor per timestep)")
 
-# Quick sanity check: sum of shap values should roughly match
-# (prediction - average background prediction)
+
 with torch.no_grad():
     prediction = wrapper(X_explain[0:1]).item()
     background_avg_pred = wrapper(X_background).mean().item()

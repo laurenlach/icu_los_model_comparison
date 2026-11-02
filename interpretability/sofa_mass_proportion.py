@@ -1,34 +1,25 @@
 import numpy as np
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# The 7 SOFA-relevant sensor indices, confirmed in Phase F
-# ---------------------------------------------------------------------------
+# The 7 SOFA-relevant sensor indices
 SOFA_SENSOR_INDICES = [27, 9, 15, 6, 39, 19, 35]  # map, bun, crea, bili, plt, fio2, o2sat
 SOFA_SENSOR_NAMES = ["map", "bun", "crea", "bili", "plt", "fio2", "o2sat"]
 
-# ---------------------------------------------------------------------------
-# TPC (SHAP) - unaffected by the baseline change, use as-is
-# ---------------------------------------------------------------------------
+# TPC (SHAP) 
 tpc_shap = np.load("tpc_shap_values_full_testset.npy").squeeze(-1)  # (10367, 48, 24)
 
 tpc_total_mass = np.abs(tpc_shap).sum()
 tpc_sofa_mass = np.abs(tpc_shap[:, SOFA_SENSOR_INDICES, :]).sum()
 tpc_sofa_pct = 100 * tpc_sofa_mass / tpc_total_mass
 
-# ---------------------------------------------------------------------------
-# BAT (IG, healthy baseline - the corrected, final version)
-# ---------------------------------------------------------------------------
+# BAT (IG, healthy baseline)
 bat_ig = np.load("bat_ig_values_full_testset_healthybaseline.npy")  # (10367, 48, 24)
 
 bat_total_mass = np.abs(bat_ig).sum()
 bat_sofa_mass = np.abs(bat_ig[:, SOFA_SENSOR_INDICES, :]).sum()
 bat_sofa_pct = 100 * bat_sofa_mass / bat_total_mass
 
-# ---------------------------------------------------------------------------
-# Also compute per-patient, so we can report a mean + spread, not just one
-# pooled number - a single global percentage can hide patient-level variation
-# ---------------------------------------------------------------------------
+# compute per-patient
 def per_patient_sofa_pct(attr_array, sofa_indices):
     total_per_patient = np.abs(attr_array).sum(axis=(1, 2))
     sofa_per_patient = np.abs(attr_array[:, sofa_indices, :]).sum(axis=(1, 2))
@@ -37,10 +28,7 @@ def per_patient_sofa_pct(attr_array, sofa_indices):
 tpc_per_patient = per_patient_sofa_pct(tpc_shap, SOFA_SENSOR_INDICES)
 bat_per_patient = per_patient_sofa_pct(bat_ig, SOFA_SENSOR_INDICES)
 
-# ---------------------------------------------------------------------------
-# Random-chance baseline: what % would we expect if attribution were spread
-# evenly across all 48 features with no clinical structure at all?
-# ---------------------------------------------------------------------------
+# Random-chance baseline
 chance_pct = 100 * len(SOFA_SENSOR_INDICES) / 48
 
 print("=== SOFA-Relevant Attribution Mass ===")

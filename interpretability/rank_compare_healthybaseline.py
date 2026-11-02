@@ -10,10 +10,11 @@ feature_names = [
     "po2", "ptt", "resp", "sbp", "temp", "tnt", "urine", "wbc"
 ]
 
-# TPC's SHAP is unaffected by BAT's baseline change - reuse the original
+# TPC's SHAP is unaffected by BAT's baseline change 
+
 tpc_shap = np.load("tpc_shap_values_full_testset.npy").squeeze(-1)
 
-# BAT: NEW healthy-baseline IG values
+# BAT:  healthy-baseline IG values
 bat_ig = np.load("bat_ig_values_full_testset_healthybaseline.npy")
 
 tpc_feature_importance = np.abs(tpc_shap).mean(axis=(0, 2))
@@ -38,7 +39,7 @@ print(f"\nTop-10 overlap: {len(overlap)}/10 - {[feature_names[i] for i in overla
 rho, pval = spearmanr(tpc_feature_importance, bat_feature_importance)
 print(f"\nSpearman correlation (full 48 features): rho={rho:.4f}, p={pval:.4g}")
 
-# Compare against the OLD baseline's ranking too, so you can see how much this changed
+# Compare against the old baseline's ranking too, so you can see how much this changed
 old_bat_ig = np.load("bat_ig_values_full_testset.npy")
 old_bat_feature_importance = np.abs(old_bat_ig).mean(axis=(0, 2))
 old_bat_rank = np.argsort(-old_bat_feature_importance)

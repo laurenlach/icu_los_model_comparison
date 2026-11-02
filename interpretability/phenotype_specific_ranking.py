@@ -9,9 +9,9 @@ feature_names = [
     "po2", "ptt", "resp", "sbp", "temp", "tnt", "urine", "wbc"
 ]
 
-# ---------------------------------------------------------------------------
+
 # 1. Load attribution + stay IDs for each model, and the phenotype mapping
-# ---------------------------------------------------------------------------
+
 tpc_shap = np.load("tpc_shap_values_full_testset.npy").squeeze(-1)   # (10367, 48, 24)
 tpc_ids = pd.read_csv("tpc_shap_full_testset_stay_ids.csv")
 
@@ -54,10 +54,10 @@ print(combined.to_string(index=False))
 combined.to_csv("phenotype_specific_feature_ranking.csv", index=False)
 print("\nSaved: phenotype_specific_feature_ranking.csv")
 
-# ---------------------------------------------------------------------------
-# 2. Quick face-validity check: does the #1 feature match clinical expectation
+
+# 2. Quick check: does the #1 feature match clinical expectation
 #    for a few obviously-relevant phenotypes?
-# ---------------------------------------------------------------------------
+
 EXPECTED = {
     "Acute and unspecified renal failure": ["crea", "bun"],
     "Other liver diseases": ["bili", "bili_dir"],

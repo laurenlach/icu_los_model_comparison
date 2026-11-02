@@ -6,9 +6,9 @@ import time
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
+
 # 1. Load the trained TPC model
-# ---------------------------------------------------------------------------
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -23,9 +23,9 @@ model.load_state_dict(torch.load("tpc_best_model_200epoch.pt", map_location="cpu
 model.eval()
 print("Trained TPC model loaded successfully.")
 
-# ---------------------------------------------------------------------------
+
 # 2. Load data
-# ---------------------------------------------------------------------------
+
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 train_rows = np.load("tpc_train_rows.npy")
@@ -36,12 +36,9 @@ np.random.seed(42)
 background_idx = np.random.choice(train_rows, size=50, replace=False)
 X_background = torch.tensor(X[background_idx], dtype=torch.float32)
 
-# ---------------------------------------------------------------------------
-# 3. Sample a modest but real set of test patients to explain.
-#    Starting with 20 to get a solid timing estimate before committing to
-#    a larger run - each patient needs its own explainer build + compute,
-#    since static features differ per patient in our wrapper approach.
-# ---------------------------------------------------------------------------
+
+# 3. Sample real set of test patients to explain
+
 n_patients_to_explain = 20
 np.random.seed(123)  # different seed from background, avoid overlap bias
 explain_sample_idx = np.random.choice(test_rows, size=n_patients_to_explain, replace=False)
@@ -83,9 +80,9 @@ total_elapsed = time.time() - start_time
 print(f"\nTotal time for {n_patients_to_explain} patients: {total_elapsed:.1f}s "
       f"({total_elapsed/n_patients_to_explain:.1f}s/patient average)")
 
-# ---------------------------------------------------------------------------
+
 # 4. Stack and save results
-# ---------------------------------------------------------------------------
+
 all_shap_values = np.stack(all_shap_values)  # shape: (n_patients, 48, 24, 1)
 print("\nFinal SHAP values array shape:", all_shap_values.shape)
 

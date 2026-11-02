@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-# --- Sensor-to-SOFA mapping, confirmed in Step 3 ---
+#Sensor-to-SOFA mapping
 SENSOR_INDEX = {
     "map": 27, "crea": 15, "bun": 9, "bili": 6,
     "plt": 39, "fio2": 19, "o2sat": 35,
@@ -16,11 +16,11 @@ ORGAN_SENSOR_MAP = {
     "sofa_resp_comp":   ["fio2", "o2sat"],
 }
 
-# --- Load SOFA scores (from Step 1) ---
+# Load SOFA scores
 sofa = pd.read_csv("sofa_24h_scores.csv")
 sofa = sofa.rename(columns={"icustay_id": "stay_id"})  # adjust if this file already uses stay_id
 
-# --- Load TPC SHAP + BAT IG attribution arrays ---
+# Load TPC SHAP + BAT IG attribution arrays
 tpc_shap = np.load("tpc_shap_values_full_testset.npy")   # expect (N, 48, 24, 1)
 if tpc_shap.ndim == 4:
     tpc_shap = tpc_shap.squeeze(-1)                        # -> (N, 48, 24)
@@ -54,9 +54,7 @@ for organ_col, sensors in ORGAN_SENSOR_MAP.items():
     for model_name, mass_df in [("TPC", tpc_mass), ("BAT", bat_mass)]:
         merged = mass_df.merge(sofa[["stay_id", organ_col]], on="stay_id", how="inner")
 
-        # Drop NA SOFA sub-scores (no lab/vital drawn in the 24h window) rather
-        # than imputing 0 — imputing would fabricate a "healthy" ground truth
-        # for patients who simply weren't tested (see Step 1 discussion).
+        # Drop NA SOFA sub-scores 
         merged = merged.dropna(subset=[organ_col])
 
         rho, pval = spearmanr(merged[organ_col], merged["attribution_mass"])
@@ -69,8 +67,7 @@ for organ_col, sensors in ORGAN_SENSOR_MAP.items():
             "p_value": pval,
         })
 
-        # Save the per-patient merged table too — Step 5 needs this joined
-        # against ICD-9 phenotype to break the alignment score out by disease group.
+        # Save the per-patient merged table too 
         merged.to_csv(f"alignment_{organ_col}_{model_name}.csv", index=False)
 
 summary = pd.DataFrame(results)

@@ -3,9 +3,9 @@ import numpy as np
 from captum.attr import IntegratedGradients
 from icu_benchmarks.models.dl_models.bat import BAT, RegressionHead
 
-# ---------------------------------------------------------------------------
-# 1. Load the trained BAT model (bridged pretrained encoder + fine-tuned head)
-# ---------------------------------------------------------------------------
+
+# 1. Load the trained BAT model 
+
 model = BAT(
     input_size=(64, 48, 24),
     value_embed_size=128,
@@ -22,10 +22,9 @@ model.load_state_dict(torch.load("bat_best_model.pt", map_location="cpu"))
 model.eval()
 print("Trained BAT model loaded successfully.")
 
-# ---------------------------------------------------------------------------
-# 2. Load one patient's data - same shapes BAT expects (recall the
-#    transpose step used for BAT, unlike TPC)
-# ---------------------------------------------------------------------------
+
+# 2. Load one patient's data 
+
 X = np.load("bat_X_scaled.npy")
 static = np.load("bat_static_scaled.npy")
 mask = np.load("bat_mask.npy")
@@ -45,20 +44,17 @@ mask_t = torch.tensor(mask_patient, dtype=torch.float32)
 
 print("X_patient shape:", X_patient_t.shape)
 
-# ---------------------------------------------------------------------------
+
 # 3. Confirm the model runs correctly on this patient before adding
 #    Integrated Gradients on top
-# ---------------------------------------------------------------------------
+
 with torch.no_grad():
     prediction = model(X_patient_t, static_t, time_t, mask_t)
 print("Direct model prediction:", prediction.item())
 
-# ---------------------------------------------------------------------------
-# 4. Set up Integrated Gradients. additional_forward_args passes the
-#    fixed inputs (static, time, mask) through to the model's forward()
-#    unchanged, while X_patient_t is the one input being explained.
-#    Baseline = all zeros (a common, simple choice - "no signal" reference).
-# ---------------------------------------------------------------------------
+
+# 4. Set up Integrated Gradients.
+
 ig = IntegratedGradients(model)
 
 baseline = torch.zeros_like(X_patient_t)
@@ -75,10 +71,6 @@ print("\nAttributions computed successfully.")
 print("Attributions shape:", attributions.shape)
 print("(Expect (1, 48, 24) - one value per sensor per timestep)")
 
-# ---------------------------------------------------------------------------
-# 5. Sanity check: Integrated Gradients has a "completeness" property too -
-#    sum of attributions should roughly equal (prediction - baseline prediction)
-# ---------------------------------------------------------------------------
 with torch.no_grad():
     baseline_prediction = model(baseline, static_t, time_t, mask_t)
 

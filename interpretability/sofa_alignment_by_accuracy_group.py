@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-# --- Sensor-to-SOFA mapping, confirmed in Phase F step 3 ---
+# Sensor-to-SOFA mapping
 ORGAN_SENSOR_MAP = {
     "sofa_cardio_comp": [27],       # map
     "sofa_renal_comp":  [9, 15],    # bun, crea
@@ -11,11 +11,11 @@ ORGAN_SENSOR_MAP = {
     "sofa_resp_comp":   [19, 35],   # fio2, o2sat
 }
 
-# --- Load SOFA scores ---
+# Load SOFA scores
 sofa = pd.read_csv("sofa_24h_scores.csv")
 sofa = sofa.rename(columns={"icustay_id": "stay_id"})
 
-# --- Load TPC SHAP + BAT IG attribution arrays and their patient order ---
+# Load TPC SHAP + BAT IG attribution arrays and their patient order
 tpc_shap = np.load("tpc_shap_values_full_testset.npy")
 if tpc_shap.ndim == 4:
     tpc_shap = tpc_shap.squeeze(-1)  # (N, 48, 24, 1) -> (N, 48, 24)
@@ -24,7 +24,7 @@ tpc_ids = pd.read_csv("tpc_shap_full_testset_stay_ids.csv")
 bat_ig = np.load("bat_ig_values_full_testset.npy")
 bat_ids = pd.read_csv("bat_ig_full_testset_stay_ids.csv")
 
-# --- Load prediction error and the existing -3 day dangerous-case masks ---
+# Load prediction error and the existing -3 day dangerous-case masks 
 tpc_error = np.load("tpc_error.npy")
 bat_error = np.load("bat_error.npy")
 tpc_dangerous = np.load("tpc_dangerous_mask_threshold_3_0days.npy")
@@ -41,8 +41,7 @@ def attribution_mass(values, ids_df, sensor_indices):
 
 
 def run_correlations(values, ids_df, dangerous_mask, model_name):
-    # Build a per-patient "accuracy group" label: dangerous vs accurate.
-    # This reuses your existing -3 day threshold, per your Phase D work.
+    
     accurate_mask = ~dangerous_mask
 
     results = []
@@ -51,8 +50,7 @@ def run_correlations(values, ids_df, dangerous_mask, model_name):
         merged = attr_df.merge(sofa[["stay_id", organ]], on="stay_id", how="inner")
         merged = merged.dropna(subset=[organ])
 
-        # Add the accuracy-group label by position (ids_df and dangerous_mask
-        # share the same row order, since they were saved together in Phase D/E)
+
         group_lookup = pd.DataFrame({"stay_id": ids_df["stay_id"], "dangerous": dangerous_mask})
         merged = merged.merge(group_lookup, on="stay_id", how="inner")
 

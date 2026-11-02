@@ -6,9 +6,9 @@ import time
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC
 
-# ---------------------------------------------------------------------------
-# 1. Load the FIXED trained TPC model
-# ---------------------------------------------------------------------------
+
+# 1. Load the TPC model
+
 model = TPC(
     input_size=(64, 48, 24),
     static_size=4,
@@ -23,9 +23,9 @@ model.load_state_dict(torch.load("tpc_best_model_fixed.pt", map_location="cpu"))
 model.eval()
 print("Trained TPC model (FIXED architecture) loaded successfully.")
 
-# ---------------------------------------------------------------------------
-# 2. Load data - unchanged, same as before
-# ---------------------------------------------------------------------------
+
+# 2. Load data 
+
 X = np.load("tpc_X_scaled.npy")
 static = np.load("tpc_static_scaled.npy")
 train_rows = np.load("tpc_train_rows.npy")
@@ -50,9 +50,9 @@ class TPCWrapperSingleStatic(torch.nn.Module):
         static_repeated = self.static_value.repeat(batch_size, 1)
         return self.model(x, static_repeated)
 
-# ---------------------------------------------------------------------------
-# 3. Run SHAP for every test patient - identical logic to the original run
-# ---------------------------------------------------------------------------
+
+# 3. Run SHAP for every test patient
+
 all_shap_values = []
 all_patient_stay_ids = []
 failed_rows = []
@@ -88,10 +88,9 @@ print(f"Successfully explained: {len(all_shap_values)} / {len(test_rows)} patien
 if failed_rows:
     print(f"Failed patients (rows): {failed_rows}")
 
-# ---------------------------------------------------------------------------
-# 4. Stack and save - NEW filenames, so the original (buggy-model) SHAP
-#    results are preserved for comparison
-# ---------------------------------------------------------------------------
+
+# 4. Stack and save 
+
 all_shap_values = np.stack(all_shap_values)
 print("\nFinal SHAP values array shape:", all_shap_values.shape)
 
