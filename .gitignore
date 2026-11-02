@@ -1,0 +1,15 @@
+*.npy
+*.npz
+*.pt
+*.pth
+*.parquet
+*.rds
+*.csv
+*.pkl
+*.zip
+*.log
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+yaib-env/
+.venv/

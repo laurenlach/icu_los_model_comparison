@@ -1,0 +1,914 @@
+import logging
+from abc import ABC
+from typing import Dict, Any, List, Optional, Union
+from pathlib import Path
+import torchmetrics
+from sklearn.metrics import log_loss, mean_squared_error, average_precision_score, roc_auc_score
+
+import torch
+from torch.nn import MSELoss, CrossEntropyLoss
+import torch.nn as nn
+from torch import Tensor, FloatTensor
+from torch.optim import Optimizer, Adam
+
+import inspect
+import gin
+import numpy as np
+from ignite.exceptions import NotComputableError
+from icu_benchmarks.models.constants import ImputationInit
+from icu_benchmarks.models.custom_metrics import confusion_matrix
+from icu_benchmarks.models.utils import create_optimizer, create_scheduler
+from joblib import dump
+from pytorch_lightning import LightningModule
+
+from icu_benchmarks.models.constants import MLMetrics, DLMetrics
+from icu_benchmarks.constants import RunMode
+
+import time # [DEBUG]
+
+gin.config.external_configurable(nn.functional.nll_loss, module="torch.nn.functional")
+gin.config.external_configurable(nn.functional.cross_entropy, module="torch.nn.functional")
+gin.config.external_configurable(nn.functional.mse_loss, module="torch.nn.functional")
+
+gin.config.external_configurable(mean_squared_error, module="sklearn.metrics")
+gin.config.external_configurable(log_loss, module="sklearn.metrics")
+gin.config.external_configurable(average_precision_score, module="sklearn.metrics")
+gin.config.external_configurable(roc_auc_score, module="sklearn.metrics")
+# gin.config.external_configurable(scorer_wrapper, module="icu_benchmarks.models.utils")
+
+
+@gin.configurable("BaseModule")
+class BaseModule(LightningModule):
+    # DL type models, requires backpropagation
+    requires_backprop = False
+    # Loss function weight initialization type
+    weight = None
+    # Metrics to be logged
+    metrics = {}
+    trained_columns = None
+    # Type of run mode
+    run_mode = None
+    debug = False
+    explain_features = False
+
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError()
+
+    def step_fn(self, batch, step_prefix=""):
+        raise NotImplementedError()
+
+    def finalize_step(self, step_prefix=""):
+        pass
+
+    def set_metrics(self, *args, **kwargs):
+        self.metrics = {}
+
+    def set_trained_columns(self, columns: List[str]):
+        self.trained_columns = columns
+
+    def set_weight(self, weight, dataset):
+        """Set the weight for the loss function."""
+
+        if isinstance(weight, list):
+            weight = FloatTensor(weight).to(self.device)
+        elif weight == "balanced":
+            weight = FloatTensor(dataset.get_balance()).to(self.device)
+        # ADDED CHOICE TO DO NO WEIGHTED LOSS
+        # Use in gin: train_common.weight = "none"
+        elif isinstance(weight, str) and weight.lower() == "none":
+            weight = None
+        self.loss_weights = weight
+
+    def training_step(self, batch, batch_idx):
+        return self.step_fn(batch, "train")
+
+    def validation_step(self, batch, batch_idx):
+        return self.step_fn(batch, "val")
+
+    def test_step(self, batch, batch_idx):
+        return self.step_fn(batch, "test")
+
+    def on_train_epoch_end(self) -> None:
+        self.finalize_step("train")
+
+    def on_validation_epoch_end(self) -> None:
+        self.finalize_step("val")
+
+    def on_test_epoch_end(self) -> None:
+        self.finalize_step("test")
+
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        checkpoint["class"] = self.__class__
+        checkpoint["trained_columns"] = self.trained_columns
+        return super().on_save_checkpoint(checkpoint)
+
+    def save_model(self, save_path, file_name, file_extension):
+        raise NotImplementedError()
+
+    def check_supported_runmode(self, runmode: RunMode):
+        if runmode not in self._supported_run_modes:
+            raise ValueError(f"Runmode {runmode} not supported for {self.__class__.__name__}")
+        return True
+
+
+@gin.configurable("DLWrapper")
+class DLWrapper(BaseModule, ABC):
+    requires_backprop = True
+    _metrics_warning_printed = set()
+    _supported_run_modes = [RunMode.classification, RunMode.regression, RunMode.imputation]
+
+    def __init__(
+        self,
+        loss=CrossEntropyLoss(),
+        optimizer=Adam,
+        run_mode: RunMode = RunMode.classification,
+        input_shape=None,
+        lr: float = 0.002,
+        momentum: float = 0.9,
+        lr_scheduler: Optional[str] = None,
+        lr_factor: float = 0.99,
+        lr_steps: Optional[List[int]] = None,
+        epochs: int = 100,
+        input_size: Tensor = None,
+        initialization_method: str = "normal",
+        **kwargs,
+    ):
+        """General interface for Deep Learning (DL) models."""
+        super().__init__()
+        self.save_hyperparameters(ignore=["loss", "optimizer"])
+        self.loss = loss
+        self.optimizer = optimizer
+        self.check_supported_runmode(run_mode)
+        self.run_mode = run_mode
+        self.input_shape = input_shape
+        self.lr = lr
+        self.momentum = momentum
+        self.lr_scheduler = lr_scheduler
+        self.lr_factor = lr_factor
+        self.lr_steps = lr_steps
+        self.epochs = epochs
+        self.input_size = input_size
+        self.initialization_method = initialization_method
+        self.scaler = None
+
+    def on_fit_start(self):
+        self.metrics = {
+            step_name: {
+                metric_name: (metric() if isinstance(metric, type) else metric)
+                for metric_name, metric in self.set_metrics().items()
+            }
+            for step_name in ["train", "val", "test"]
+        }
+        return super().on_fit_start()
+
+    def on_train_start(self):
+        self.metrics = {
+            step_name: {
+                metric_name: (metric() if isinstance(metric, type) else metric)
+                for metric_name, metric in self.set_metrics().items()
+            }
+            for step_name in ["train", "val", "test"]
+        }
+        return super().on_train_start()
+
+    def finalize_step(self, step_prefix=""):
+        try:
+            self.log_dict(
+                {
+                    f"{step_prefix}/{name}": (
+                        np.float32(metric.compute()) if isinstance(metric.compute(), np.float64) else metric.compute()
+                    )
+                    for name, metric in self.metrics[step_prefix].items()
+                    if "_Curve" not in name
+                },
+                sync_dist=True,
+            )
+            for metric in self.metrics[step_prefix].values():
+                metric.reset()
+        except (NotComputableError, ValueError):
+            if step_prefix not in self._metrics_warning_printed:
+                self._metrics_warning_printed.add(step_prefix)
+                logging.warning(f"Metrics for {step_prefix} not computable")
+            pass
+
+    def configure_optimizers(self):
+        """Configure optimizers and learning rate schedulers."""
+
+        if isinstance(self.optimizer, str):
+            optimizer = create_optimizer(self.optimizer, self.lr, self.hparams.momentum)
+        elif isinstance(self.optimizer, Optimizer):
+            # Already set
+            optimizer = self.optimizer
+        else:
+            optimizer = self.optimizer(self.parameters())
+
+        if self.hparams.lr_scheduler is None or self.hparams.lr_scheduler == "":
+            return optimizer
+        scheduler = create_scheduler(
+            self.hparams.lr_scheduler, optimizer, self.hparams.lr_factor, self.hparams.lr_steps, self.hparams.epochs
+        )
+        optimizers = {"optimizer": optimizer, "lr_scheduler": scheduler}
+        logging.info(f"Using: {optimizers}")
+        return optimizers
+
+    def on_test_epoch_start(self) -> None:
+        self.metrics = {
+            step_name: {metric_name: metric() for metric_name, metric in self.set_metrics().items()}
+            for step_name in ["train", "val", "test"]
+        }
+        return super().on_test_epoch_start()
+
+    def save_model(self, save_path, file_name, file_extension=".ckpt"):
+        path = save_path / (file_name + file_extension)
+        try:
+            torch.save(self, path)
+            logging.info(f"Model saved to {str(path.resolve())}.")
+        except Exception as e:
+            logging.error(f"Cannot save model to path {str(path.resolve())}: {e}.")
+
+
+@gin.configurable("DLPredictionWrapper")
+class DLPredictionWrapper(DLWrapper):
+    """Interface for Deep Learning models."""
+
+    _supported_run_modes = [RunMode.classification, RunMode.regression]
+
+    def __init__(
+        self,
+        loss=CrossEntropyLoss(),
+        optimizer=torch.optim.Adam,
+        run_mode: RunMode = RunMode.classification,
+        input_shape=None,
+        lr: float = 0.002,
+        momentum: float = 0.9,
+        lr_scheduler: Optional[str] = None,
+        lr_factor: float = 0.99,
+        lr_steps: Optional[List[int]] = None,
+        epochs: int = 100,
+        input_size: Tensor = None,
+        initialization_method: str = "normal",
+        **kwargs,
+    ):
+        super().__init__(
+            loss=loss,
+            optimizer=optimizer,
+            run_mode=run_mode,
+            input_shape=input_shape,
+            lr=lr,
+            momentum=momentum,
+            lr_scheduler=lr_scheduler,
+            lr_factor=lr_factor,
+            lr_steps=lr_steps,
+            epochs=epochs,
+            input_size=input_size,
+            initialization_method=initialization_method,
+            kwargs=kwargs,
+        )
+        self.output_transform = None
+        self.loss_weights = None
+
+    def set_metrics(self, *args):
+        """Set the evaluation metrics for the prediction model."""
+
+        def softmax_binary_output_transform(output):
+            with torch.no_grad():
+                y_pred, y = output
+                y_pred = torch.softmax(y_pred, dim=1)
+                return y_pred[:, -1], y
+
+        def softmax_multi_output_transform(output):
+            with torch.no_grad():
+                y_pred, y = output
+                y_pred = torch.softmax(y_pred, dim=1)
+                return y_pred, y
+
+        # Output transform is not applied for contrib metrics, so we do our own.
+        if self.run_mode == RunMode.classification:
+            # Binary classification
+            if self.logit.out_features == 2:
+                self.output_transform = softmax_binary_output_transform
+                metrics = DLMetrics.BINARY_CLASSIFICATION
+            else:
+                # Multiclass classification
+                self.output_transform = softmax_multi_output_transform
+                metrics = DLMetrics.MULTICLASS_CLASSIFICATION
+        # Regression
+        elif self.run_mode == RunMode.regression:
+            self.output_transform = lambda x: x
+            metrics = DLMetrics.REGRESSION
+        else:
+            raise ValueError(f"Run mode {self.run_mode} not supported.")
+        for key, value in metrics.items():
+            # Torchmetrics metrics are not moved to the device by default
+            if isinstance(value, torchmetrics.Metric):
+                value.to(self.device)
+        return metrics
+
+    def step_fn(self, element, step_prefix=""):
+        """Perform a step in the DL prediction model training loop.
+
+        Args:
+            element (object):
+            step_prefix (str): Step type, by default: test, train, val.
+        """
+
+        if len(element) == 2:
+            data, labels = element[0], element[1].to(self.device)
+            if isinstance(data, list):
+                for i in range(len(data)):
+                    data[i] = data[i].float().to(self.device)
+            else:
+                data = data.float().to(self.device)
+            mask = torch.ones_like(labels).bool()
+
+        elif len(element) == 3:
+            data, labels, mask = element[0], element[1].to(self.device), element[2].to(self.device)
+            if isinstance(data, list):
+                for i in range(len(data)):
+                    data[i] = data[i].float().to(self.device)
+            else:
+                data = data.float().to(self.device)
+        else:
+            raise Exception("Loader should return either (data, label) or (data, label, mask)")
+        out = self(data)
+
+        # If aux_loss is present, it is returned as a tuple
+        if len(out) == 2 and isinstance(out, tuple):
+            out, aux_loss = out
+        else:
+            aux_loss = 0
+        # Get prediction and target
+        prediction = torch.masked_select(out, mask.unsqueeze(-1)).reshape(-1, out.shape[-1]).to(self.device)
+        target = torch.masked_select(labels, mask).to(self.device)
+
+        # [DEBUG] Print prediction and label information for first few batches
+        if hasattr(self, '_debug_batch_count'):
+            self._debug_batch_count[step_prefix] = self._debug_batch_count.get(step_prefix, 0) + 1
+        else:
+            self._debug_batch_count = {step_prefix: 1}
+
+        if self._debug_batch_count[step_prefix] <= 3:
+            """
+            print(f"\n{'='*80}")
+            print(f"[DEBUG {step_prefix.upper()}] Batch {self._debug_batch_count[step_prefix]}")
+            print(f"{'='*80}")
+            print(f"\n🔍 PREDICTION STRUCTURE:")
+            print(f"   Raw model output shape: {out.shape}")
+            if len(out.shape) == 3:
+                print(f"   → (batch={out.shape[0]}, timesteps={out.shape[1]}, classes={out.shape[2]})")
+                print(f"   → Model makes predictions at EVERY timestep!")
+            print(f"\n   Mask shape: {mask.shape}")
+            if len(mask.shape) == 2:
+                print(f"   → (batch={mask.shape[0]}, timesteps={mask.shape[1]})")
+                print(f"   → Mask determines which timesteps are valid/used")
+                print(f"   → Number of True values in mask (valid predictions): {mask.sum().item()}")
+            print(f"\n   After masking:")
+            print(f"   Prediction shape: {prediction.shape} ({prediction.shape[0]} total predictions)")
+            print(f"   Target shape: {target.shape} ({target.shape[0]} total labels)")
+            print(f"   → These are FLATTENED: all valid timesteps from all patients in batch")
+
+            print(f"\n📊 SAMPLE DATA (first patient's valid timesteps):")
+            # Calculate how many timesteps for first patient
+            first_patient_mask = mask[0]
+            n_valid = first_patient_mask.sum().item()
+            print(f"   First patient has {n_valid} valid timesteps (out of {len(first_patient_mask)} total)")
+
+            print(f"\n   First 5 predictions (logits):")
+            print(f"   {prediction[:5]}")
+            print(f"\n   First 5 targets:")
+            print(f"   {target[:5]}")
+            if prediction.shape[-1] > 1:
+                # For classification, show softmax probabilities
+                probs = torch.softmax(prediction, dim=1)
+                print(f"\n   First 5 predictions (probabilities):")
+                print(f"   {probs[:5]}")
+                print(f"\n   Predicted classes (argmax): {torch.argmax(probs[:5], dim=1)}")
+                print(f"\n   Label distribution in batch:")
+                print(f"   Class 0: {(target == 0).sum().item()} ({100*(target == 0).sum().item()/len(target):.1f}%)")
+                print(f"   Class 1: {(target == 1).sum().item()} ({100*(target == 1).sum().item()/len(target):.1f}%)")
+            print(f"{'='*80}\n")
+            """
+
+        if prediction.shape[-1] > 1 and self.run_mode == RunMode.classification:
+            # Classification task
+            loss = self.loss(prediction, target.long(), weight=self.loss_weights.to(self.device)) + aux_loss
+            # Returns torch.long because negative log likelihood loss
+        elif self.run_mode == RunMode.regression:
+            # Regression task
+            loss = self.loss(prediction[:, 0], target.float()) + aux_loss
+        else:
+            raise ValueError(f"Run mode {self.run_mode} not yet supported. Please implement it.")
+        transformed_output = self.output_transform((prediction, target))
+
+        for key, value in self.metrics[step_prefix].items():
+            if isinstance(value, torchmetrics.Metric):
+                if key == "Binary_Fairness":
+                    feature_names = key.feature_helper(self.trainer)
+                    value.update(transformed_output[0], transformed_output[1], data, feature_names)
+                else:
+                    value.update(transformed_output[0], transformed_output[1])
+            else:
+                value.update(transformed_output)
+        self.log(f"{step_prefix}/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        return loss
+
+
+@gin.configurable("MLWrapper")
+class MLWrapper(BaseModule, ABC):
+    """Interface for prediction with traditional Scikit-learn-like Machine Learning models."""
+
+    requires_backprop = False
+    _supported_run_modes = [RunMode.classification, RunMode.regression]
+
+    def __init__(self, *args, run_mode=RunMode.classification, loss=log_loss, patience=10, mps=False, **kwargs):
+        super().__init__()
+        self.save_hyperparameters()
+        self.scaler = None
+        self.check_supported_runmode(run_mode)
+        self.run_mode = run_mode
+        self.loss = loss
+        self.patience = patience
+        self.mps = mps
+        self.loss_weight = None
+
+    def set_metrics(self, labels):
+        if self.run_mode == RunMode.classification:
+            # Binary classification
+            if len(np.unique(labels)) == 2:
+                # if isinstance(self.model, lightgbm.basic.Booster):
+                self.output_transform = lambda x: x[:, 1]
+                self.label_transform = lambda x: x
+
+                self.metrics = MLMetrics.BINARY_CLASSIFICATION
+            # Multiclass classification
+            else:
+                # Todo: verify multiclass classification
+                self.output_transform = lambda x: np.argmax(x, axis=-1)
+                self.label_transform = lambda x: x
+                self.metrics = MLMetrics.MULTICLASS_CLASSIFICATION
+
+        # Regression
+        else:
+            if self.scaler is not None:  # We invert transform the labels and predictions if they were scaled.
+                self.output_transform = lambda x: self.scaler.inverse_transform(x.reshape(-1, 1))
+                self.label_transform = lambda x: self.scaler.inverse_transform(x.reshape(-1, 1))
+            else:
+                self.output_transform = lambda x: x
+                self.label_transform = lambda x: x
+            self.metrics = MLMetrics.REGRESSION
+
+    def fit(self, train_dataset, val_dataset):
+        """Fit the model to the training data."""
+        train_rep, train_label, row_indicators = train_dataset.get_data_and_labels()
+        val_rep, val_label, row_indicators = val_dataset.get_data_and_labels()
+
+        self.set_metrics(train_label)
+
+        if "class_weight" in self.model.get_params().keys():  # Set class weights
+            self.model.set_params(class_weight=self.weight)
+
+        val_loss = self.fit_model(train_rep, train_label, val_rep, val_label)
+
+        train_pred = self.predict(train_rep)
+
+        logging.debug(f"Model:{self.model}")
+
+        self.log("train/loss", self.loss(train_label, train_pred), sync_dist=True)
+        logging.debug(f"Train loss: {self.loss(train_label, train_pred)}")
+        self.log("val/loss", val_loss, sync_dist=True)
+        logging.debug(f"Val loss: {val_loss}")
+        self.log_metrics(train_label, train_pred, "train")
+
+    def fit_model(self, train_data, train_labels, val_data, val_labels):
+        """Fit the model to the training data (default SKlearn syntax)"""
+        self.model.fit(train_data, train_labels)
+        val_loss = 0.0
+        return val_loss
+
+    def validation_step(self, val_dataset, _):
+        val_rep, val_label, row_indicators = val_dataset.get_data_and_labels()
+        val_rep, val_label = torch.from_numpy(val_rep).to(self.device), torch.from_numpy(val_label).to(self.device)
+        self.set_metrics(val_label)
+
+        val_pred = self.predict(val_rep)
+
+        self.log_metrics("val/loss", self.loss(val_label, val_pred), sync_dist=True)
+        logging.info(f"Val loss: {self.loss(val_label, val_pred)}")
+        self.log_metrics(val_label, val_pred, "val")
+
+    def test_step(self, dataset, _):
+        test_rep, test_label, pred_indicators = dataset
+        test_rep, test_label, pred_indicators = (
+            test_rep.squeeze().cpu().numpy(),
+            test_label.squeeze().cpu().numpy(),
+            pred_indicators.squeeze().cpu().numpy(),
+        )
+        self.set_metrics(test_label)
+        test_pred = self.predict(test_rep)
+        if self.debug:
+            self._save_model_outputs(pred_indicators, test_pred, test_label)
+        if self.explain_features:
+            self.explain_model(test_rep, test_label)
+        if self.mps:
+            self.log("test/loss", np.float32(self.loss(test_label, test_pred)), sync_dist=True)
+            self.log_metrics(np.float32(test_label), np.float32(test_pred), "test")
+        else:
+            self.log("test/loss", self.loss(test_label, test_pred), sync_dist=True)
+            self.log_metrics(test_label, test_pred, "test")
+        logging.debug(f"Test loss: {self.loss(test_label, test_pred)}")
+
+    def predict(self, features):
+        if self.run_mode == RunMode.regression:
+            return self.model.predict(features)
+        else:  # Classification: return probabilities
+            return self.model.predict_proba(features)
+
+    def log_metrics(self, label, pred, metric_type):
+        """Log metrics to the PL logs."""
+        if "Confusion_Matrix" in self.metrics:
+            self.log_dict(confusion_matrix(self.label_transform(label), self.output_transform(pred)), sync_dist=True)
+        self.log_dict(
+            {
+                f"{metric_type}/{name}": (metric(self.label_transform(label), self.output_transform(pred)))
+                # For every metric
+                for name, metric in self.metrics.items()
+                # Filter out metrics that return a tuple (e.g. precision_recall_curve)
+                if not isinstance(metric(self.label_transform(label), self.output_transform(pred)), tuple)
+                and name != "Confusion_Matrix"
+            },
+            sync_dist=True,
+        )
+
+    def _explain_model(self, test_rep, test_label):
+        if self.explainer is not None:
+            self.test_shap_values = self.explainer(test_rep)
+        else:
+            logging.warning("No explainer or explain_features values set.")
+
+    def _save_model_outputs(self, pred_indicators, test_pred, test_label):
+        if len(pred_indicators.shape) > 1 and len(test_pred.shape) > 1 and pred_indicators.shape[1] == test_pred.shape[1]:
+            pred_indicators = np.hstack((pred_indicators, test_label.reshape(-1, 1)))
+            pred_indicators = np.hstack((pred_indicators, test_pred))
+            # Save as: id, time (hours), ground truth, prediction 0, prediction 1
+            np.savetxt(Path(self.logger.save_dir) / "pred_indicators.csv", pred_indicators, delimiter=",")
+            logging.debug(f"Saved row indicators to {Path(self.logger.save_dir) / f'row_indicators.csv'}")
+        else:
+            logging.warning("Could not save row indicators.")
+
+    def configure_optimizers(self):
+        return None
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        del state["label_transform"]
+        del state["output_transform"]
+        return state
+
+    def save_model(self, save_path, file_name, file_extension=".joblib"):
+        path = save_path / (file_name + file_extension)
+        try:
+            dump(self.model, path)
+            logging.info(f"Model saved to {str(path.resolve())}.")
+        except Exception as e:
+            logging.error(f"Cannot save model to path {str(path.resolve())}: {e}.")
+
+    def set_model_args(self, model, *args, **kwargs):
+        """Set hyperparameters of the model if they are supported by the model."""
+        signature = inspect.signature(model.__init__).parameters
+        possible_hps = list(signature.keys())
+        # Get passed keyword arguments
+        arguments = locals()["kwargs"]
+        # Get valid hyperparameters
+        logging.debug(f"Possible hps: {possible_hps}")
+        hyperparams = {key: value for key, value in arguments.items() if key in possible_hps}
+        logging.debug(f"Creating model with: {hyperparams}.")
+        return model(**hyperparams)
+
+
+@gin.configurable("ImputationWrapper")
+class ImputationWrapper(DLWrapper):
+    """Interface for imputation models."""
+
+    requires_backprop = True
+    _supported_run_modes = [RunMode.imputation]
+
+    def __init__(
+        self,
+        loss: nn.modules.loss._Loss = MSELoss(),
+        optimizer: Union[str, Optimizer] = "adam",
+        run_mode: RunMode = RunMode.imputation,
+        lr: float = 0.002,
+        momentum: float = 0.9,
+        lr_scheduler: Optional[str] = None,
+        lr_factor: float = 0.99,
+        lr_steps: Optional[List[int]] = None,
+        input_size: Tensor = None,
+        initialization_method: ImputationInit = ImputationInit.NORMAL,
+        epochs=100,
+        **kwargs: str,
+    ) -> None:
+        super().__init__(
+            loss=loss,
+            optimizer=optimizer,
+            run_mode=run_mode,
+            lr=lr,
+            momentum=momentum,
+            lr_scheduler=lr_scheduler,
+            lr_factor=lr_factor,
+            lr_steps=lr_steps,
+            epochs=epochs,
+            input_size=input_size,
+            initialization_method=initialization_method,
+            kwargs=kwargs,
+        )
+        self.check_supported_runmode(run_mode)
+        self.run_mode = run_mode
+        self.save_hyperparameters(ignore=["loss", "optimizer"])
+        self.loss = loss
+        self.optimizer = optimizer
+
+    def set_metrics(self):
+        return DLMetrics.IMPUTATION
+
+    def init_weights(self, init_type="normal", gain=0.02):
+        def init_func(m):
+            classname = m.__class__.__name__
+            if hasattr(m, "weight") and (classname.find("Conv") != -1 or classname.find("Linear") != -1):
+                if init_type == ImputationInit.NORMAL:
+                    nn.init.normal_(m.weight.data, 0.0, gain)
+                elif init_type == ImputationInit.XAVIER:
+                    nn.init.xavier_normal_(m.weight.data, gain=gain)
+                elif init_type == ImputationInit.KAIMING:
+                    nn.init.kaiming_normal_(m.weight.data, a=0, mode="fan_out")
+                elif init_type == ImputationInit.ORTHOGONAL:
+                    nn.init.orthogonal_(m.weight.data, gain=gain)
+                else:
+                    raise NotImplementedError(f"Initialization method {init_type} is not implemented")
+                if hasattr(m, "bias") and m.bias is not None:
+                    nn.init.constant_(m.bias.data, 0.0)
+            elif classname.find("BatchNorm2d") != -1:
+                nn.init.normal_(m.weight.data, 1.0, gain)
+                nn.init.constant_(m.bias.data, 0.0)
+
+        self.apply(init_func)
+
+    def on_fit_start(self) -> None:
+        self.init_weights(self.hparams.initialization_method)
+        for metrics in self.metrics.values():
+            for metric in metrics.values():
+                metric.reset()
+        return super().on_fit_start()
+
+    def step_fn(self, batch, step_prefix=""):
+        amputated, amputation_mask, target, target_missingness = batch
+        imputated = self(amputated, amputation_mask)
+        amputated[amputation_mask > 0] = imputated[amputation_mask > 0]
+        amputated[target_missingness > 0] = target[target_missingness > 0]
+
+        loss = self.loss(amputated, target)
+        self.log(f"{step_prefix}/loss", loss.item(), prog_bar=True)
+
+        for metric in self.metrics[step_prefix].values():
+            metric.update(
+                (torch.flatten(amputated.detach(), start_dim=1).clone(), torch.flatten(target.detach(), start_dim=1).clone())
+            )
+        return loss
+
+    def fit(self, train_dataset, val_dataset):
+        raise NotImplementedError()
+
+    def predict_step(self, data, amputation_mask=None):
+        return self(data, amputation_mask)
+
+    def predict(self, data):
+        self.eval()
+        data = data.to(self.device)
+        data_missingness = torch.isnan(data).to(torch.float32)
+        prediction = self.predict_step(data, data_missingness)
+        data[data_missingness.bool()] = prediction[data_missingness.bool()]
+        return data
+
+@gin.configurable("CustomDLPredictionWrapper")
+class CustomDLPredictionWrapper(DLWrapper):
+    """Custom wrapper for models using BATPolarsDataset with dynamic/static/time features.
+    Currently supports binary classification. Can be extended to regression and multiclass.
+    """
+    _supported_run_modes = [RunMode.classification, RunMode.regression]
+
+    def __init__(self, input_size=None ,**kwargs):
+        self.save_hyperparameters() 
+        super().__init__(input_size=input_size, **kwargs)
+        self.output_transform = None
+        self.loss_weights = None
+
+    def set_metrics(self, *args):
+        """Setup metrics depending on task."""
+        if self.run_mode == RunMode.classification:
+            # Binary classification (default for now)
+            metrics = DLMetrics.BINARY_CLASSIFICATION
+            self.output_transform = lambda out: (
+                torch.softmax(out[0], dim=1)[:, 1],  # Probability of class 1
+                out[1]  # Ground truth
+            )
+        elif self.run_mode == RunMode.regression:
+            metrics = DLMetrics.REGRESSION
+            self.output_transform = lambda out: out  # No transform needed
+        else:
+            raise ValueError(f"Unsupported run mode: {self.run_mode}")
+        return metrics
+
+    def step_fn(self, batch, step_prefix=""):
+      """
+      Accepts batches from BATPolarsDataset with structure:
+      data, mask, label, times, static, delta, obs_mask
+      Only the first 5 tensors are used by the current model.
+      """
+
+      data, mask, label, times, static, *rest = batch
+
+      # rest might be: [delta, obs_mask] or [obs_mask] or []
+      obs_mask = None
+      if len(rest) >= 1:
+          obs_mask = rest[-1]
+
+      data = data.to(self.device).float()
+      mask = mask.to(self.device).float()
+      times = times.to(self.device).float()
+      static = static.to(self.device).float()
+      label = label.to(self.device)
+
+      # Forward pass
+      output = self(data, static=static, time=times, sensor_mask=mask)
+
+      # -------------------------
+      # Loss + metric preparation
+      # -------------------------
+      if self.run_mode == RunMode.classification:
+          logits = output
+          y = label
+
+          if logits.ndim == 3:
+              # (B, T, C) -> (B*T, C)
+              logits = logits.reshape(-1, logits.shape[-1])
+              y = y.reshape(-1)
+
+          loss = self.loss(logits, y.squeeze().long())  # CrossEntropyLoss
+
+          # metrics expect whatever your output_transform expects
+          transformed_output = self.output_transform((logits, y))
+
+      elif self.run_mode == RunMode.regression:
+          pred = output.squeeze()
+          target = label
+
+          # Per-timestep regression with mask: pred/target are (B, T)
+          if obs_mask is not None and pred.ndim == 2 and target.ndim == 2:
+              obs_mask = obs_mask.to(self.device).bool()
+              pred_1d = pred[obs_mask]
+              target_1d = target.float()[obs_mask]
+          else:
+              # Sequence-level regression: ensure both are 1D aligned
+              if target.dim() > 1:
+                  target = target[:, 0]
+              pred_1d = pred.reshape(-1).float()
+              target_1d = target.reshape(-1).float()
+
+          loss = self.loss(pred_1d, target_1d)
+
+          # IMPORTANT: update metrics with 1D tensors so concatenation works
+          transformed_output = (pred_1d.detach(), target_1d.detach())
+
+      else:
+          raise ValueError("Unsupported run mode.")
+
+      # -------------
+      # Update metrics
+      # -------------
+      for key, metric in self.metrics[step_prefix].items():
+          if isinstance(metric, torchmetrics.Metric):
+              # torchmetrics typically expects metric.update(preds, target)
+              metric.update(*transformed_output)
+          else:
+              metric.update(transformed_output)
+
+      self.log(f"{step_prefix}/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+      return loss
+
+
+@gin.configurable("SSLWrapper")
+class SSLWrapper(DLWrapper):
+    _supported_run_modes = [RunMode.regression]
+
+    def __init__(
+        self,
+        clip_grad: bool = False,
+        max_grad_norm: float = 1.0,
+        log_grad_norm: bool = False,
+        input_size=None,
+        **kwargs,
+    ):
+        self.save_hyperparameters()
+        super().__init__(input_size=input_size, **kwargs)
+        self.clip_grad = clip_grad
+        self.max_grad_norm = max_grad_norm
+        self.log_grad_norm = log_grad_norm
+        self.output_transform = lambda out: out
+        self.loss_weights = None
+        self._prev_batch_end_time = None # [DEBUG]
+
+    def set_metrics(self, *args):
+        return DLMetrics.REGRESSION
+
+    def step_fn(self, batch, step_prefix=""):
+
+        # ⏱ Measure gap since last batch
+        #now = time.time()
+        #if self._prev_batch_end_time is not None:
+        #    gap = now - self._prev_batch_end_time
+        #    if self.global_step % 10 == 0:
+        #        print(f"[TIMING] Time since last batch: {gap:.3f} seconds")
+        #batch_start_time = now
+
+        # Unpack
+        obs_data, obs_mask, obs_times, obs_delta, forecast_target, forecast_mask, static = batch
+
+        # Transfer to device
+        obs_data = obs_data.to(self.device).float()
+        obs_mask = obs_mask.to(self.device).float()
+        obs_times = obs_times.to(self.device).float()
+        obs_delta = obs_delta.to(self.device).float()
+        static = static.to(self.device).float()
+        forecast_target = forecast_target.to(self.device).float()
+        forecast_mask = forecast_mask.to(self.device).float()
+        # Needs to be float16 to perform flash attention
+        #obs_data = obs_data.to(dtype=torch.float16, device=self.device)
+        #obs_mask = obs_mask.to(dtype=torch.float16, device=self.device)
+        #obs_times = obs_times.to(dtype=torch.float16, device=self.device)
+        #obs_delta = obs_delta.to(dtype=torch.float16, device=self.device)
+        #static = static.to(dtype=torch.float16, device=self.device)
+        #forecast_target = forecast_target.to(dtype=torch.float16, device=self.device)
+        #forecast_mask = forecast_mask.to(dtype=torch.float16, device=self.device)
+
+        # Forward pass
+        prediction = self(obs_data, static, obs_times, obs_mask)
+
+        # Compute masked loss
+        masked_pred = torch.masked_select(prediction, forecast_mask.bool())
+        masked_target = torch.masked_select(forecast_target, forecast_mask.bool())
+        loss = self.loss(masked_pred, masked_target)
+        
+        # Update metrics
+        transformed_output = self.output_transform((masked_pred, masked_target))
+        for key, metric in self.metrics[step_prefix].items():
+            metric.update(transformed_output)
+
+    
+        # Log loss
+        self.log(f"{step_prefix}/loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+
+        # ⏱ Total batch time
+        #total_batch_time = time.time() - batch_start_time
+        #if self.global_step % 10 == 0:
+        #    print(f"[TIMING] Step {self.global_step} took {total_batch_time:.3f} seconds")
+
+        # Save timestamp for next batch
+        #self._prev_batch_end_time = time.time()
+
+        return loss
+
+    # After loss.backward() but before optimizer.step() 
+    def on_after_backward(self):
+        total_norm_before = 0.0
+        for p in self.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.detach().data.norm(2)
+                total_norm_before += param_norm.item() ** 2
+        total_norm_before = total_norm_before ** 0.5
+
+        # Clip gradients (in-place)
+        if self.clip_grad:
+            torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=self.max_grad_norm)
+
+        # Recompute total norm after clipping
+        total_norm_after = 0.0
+        for p in self.parameters():
+            if p.grad is not None:
+                param_norm = p.grad.detach().data.norm(2)
+                total_norm_after += param_norm.item() ** 2
+        total_norm_after = total_norm_after ** 0.5
+
+        if self.log_grad_norm:
+            self.log("grad_norm/pre_clip", total_norm_before, on_step=True, on_epoch=False)
+            self.log("grad_norm/post_clip", total_norm_after, on_step=True, on_epoch=False)
+            self.log("grad_norm/clipping_ratio", total_norm_after / (total_norm_before + 1e-8), on_step=True, on_epoch=False)
+    def on_train_epoch_start(self):
+            self.epoch_start_time = time.time()
+
+    def on_train_epoch_end(self):
+        epoch_time = time.time() - self.epoch_start_time
+        print(f"[INFO] Epoch {self.current_epoch} took {epoch_time:.2f} seconds")
+
+        if self.current_epoch % 10 == 0:
+            save_path = Path(self.logger.save_dir) / f"manual-model-epoch-{self.current_epoch}.ckpt"
+            self.trainer.save_checkpoint(str(save_path))
+            print(f"[INFO] Saved model manually at {save_path}")
