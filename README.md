@@ -2,7 +2,6 @@
 
 BSc Honours research project, School of Computer Science and Applied Mathematics, University of the Witwatersrand, 2026.
 
-- **Author:** Lauren Lachman (Student No. 2702445)
 - **Supervisor:** Dr. Hairong Bau
 
 ## What this project does
