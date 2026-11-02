@@ -70,10 +70,7 @@ class TPC(DLPredictionWrapper):
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(p=dropout)
 
-        # ---------------------------------------------------------------
-        # Build each layer's temporal conv + pointwise linear, properly
-        # registered so PyTorch tracks their parameters for training.
-        # ---------------------------------------------------------------
+        # Build each layer's temporal conv + pointwise linear
         self.layer_modules = nn.ModuleDict()
 
         Y = 0    # temp_kernels produced by the previous layer (0 for layer 0)
@@ -108,10 +105,8 @@ class TPC(DLPredictionWrapper):
 
         self.Zt_final = Zt
 
-        # ---------------------------------------------------------------
         # Final prediction layer: combines last-timestep representation
         # with static features, outputs one LOS value per patient.
-        # ---------------------------------------------------------------
         # self.final_linear = nn.Linear(self.Zt_final + static_size, 1)
         self.final_linear = nn.Linear(self.Zt_final + (self.F * temp_kernels) + static_size, 1)
 
@@ -171,51 +166,3 @@ class TPC(DLPredictionWrapper):
         prediction = self.final_linear(final_combined)  # (B, 1)
 
         return prediction
-
-    # def forward(self, x, static):
-    #     # x: (B, F, T) - sensor data, channels-first
-    #     # static: (B, static_size)
-    #     B, F, T = x.shape
-
-    #     current_X = x.unsqueeze(2)  # (B, F, 1, T) - "slot" dimension for per-sensor channels
-    #     point_skip_list = []
-    #     Y = 0
-
-    #     for i in range(self.n_layers):
-    #         layer = self.layer_modules[str(i)]
-    #         channels_per_sensor = 1 + Y
-
-    #         conv_input = current_X.reshape(B, F * channels_per_sensor, T)
-    #         temp_out = layer["chomp"](layer["temp_conv"](conv_input))  # (B, F*temp_kernels, T)
-
-    #         # Pointwise layer: original sensor values at each timestep + everything
-    #         # accumulated by previous layers so far
-    #         flat_X = x.permute(0, 2, 1).reshape(B * T, F)
-    #         if point_skip_list:
-    #             prior_points = torch.cat(point_skip_list, dim=-1)  # (B, T, Zt_so_far)
-    #             prior_points = prior_points.reshape(B * T, -1)
-    #             pointwise_input = torch.cat([flat_X, prior_points], dim=-1)
-    #         else:
-    #             pointwise_input = flat_X
-
-    #         point_out = self.dropout(self.relu(layer["pointwise"](pointwise_input)))
-    #         point_out = point_out.view(B, T, self.point_size)
-    #         point_skip_list.append(point_out)
-
-    #         # Prepare next layer's temporal input: original value + all temporal
-    #         # outputs produced so far, kept grouped per sensor
-    #         temp_out_reshaped = temp_out.view(B, F, self.temp_kernels, T)
-    #         original_slot = x.unsqueeze(2)
-    #         current_X = torch.cat([original_slot, temp_out_reshaped], dim=2)
-
-    #         Y = self.temp_kernels
-
-    #     # Combine all layers' pointwise outputs, take the last timestep only
-    #     # (single prediction per patient, not per-timestep)
-    #     combined_points = torch.cat(point_skip_list, dim=-1)  # (B, T, Zt_final)
-    #     final_timestep_repr = combined_points[:, -1, :]       # (B, Zt_final)
-
-    #     final_combined = torch.cat([final_timestep_repr, static], dim=-1)
-    #     prediction = self.final_linear(final_combined)  # (B, 1)
-
-    #     return prediction
