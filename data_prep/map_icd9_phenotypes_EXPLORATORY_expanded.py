@@ -1,17 +1,10 @@
 import pandas as pd
 import yaml
 
-# ---------------------------------------------------------------------------
 # EXPLORATORY TEST: use ALL 283 HCUP CCS categories, not just the 25
-# Harutyunyan et al. selected for their benchmark. This is NOT the
-# standard, citable scheme - it's a supplementary check to see how much
-# coverage improves if we accept a much larger, less-established set of
-# (often very narrow) categories.
+# Harutyunyan et al. selected for their benchmark. This is a supplementary check to see how much
+# coverage improves if we accept a larger, less-established set of categories.
 #
-# Uses PRIMARY diagnosis only (same as the original baseline mapping),
-# so this isolates the effect of "more categories" separately from the
-# effect of "secondary diagnosis fallback" (tested in the other script).
-# ---------------------------------------------------------------------------
 
 with open("hcup_ccs_2015_definitions.yaml", "r") as f:
     phenotype_defs = yaml.safe_load(f)
@@ -23,9 +16,6 @@ for phenotype_name, info in phenotype_defs.items():
     for code in info["codes"]:
         code_to_phenotype_all[code] = phenotype_name
 
-# ---------------------------------------------------------------------------
-# Map using primary diagnosis only, same as the original baseline script
-# ---------------------------------------------------------------------------
 icd_data = pd.read_csv("icd9_primary_diagnosis.csv")
 icd_data["icd9_code"] = icd_data["icd9_code"].astype(str)
 icd_data["phenotype_expanded"] = icd_data["icd9_code"].map(code_to_phenotype_all)
@@ -39,10 +29,6 @@ print(f"\nWith all {len(phenotype_defs)} categories (primary diagnosis only): "
       f"{n_mapped} / {n_total} mapped ({100*n_mapped/n_total:.1f}%)")
 print("(Compare to standard 25-category, primary-only result: 25,783 / 51,835 = 49.7%)")
 
-# ---------------------------------------------------------------------------
-# Show the distribution - flag how many categories end up with very few
-# patients, since small groups make later statistical comparisons unreliable
-# ---------------------------------------------------------------------------
 counts = cohort_icd_expanded["phenotype_expanded"].value_counts()
 print(f"\nTotal distinct phenotype groups populated: {len(counts)}")
 print(f"Groups with fewer than 30 patients: {(counts < 30).sum()}")
@@ -54,9 +40,6 @@ print(counts.head(25))
 print("\nBottom 10 groups by patient count (smallest, most statistically fragile):")
 print(counts.tail(10))
 
-# ---------------------------------------------------------------------------
-# Save - clearly distinct filename, flagged as exploratory
-# ---------------------------------------------------------------------------
 cohort_icd_expanded.to_csv("cohort_icd9_phenotype_mapping_EXPLORATORY_all_categories.csv", index=False)
 print("\nSaved: cohort_icd9_phenotype_mapping_EXPLORATORY_all_categories.csv")
 print("Done.")

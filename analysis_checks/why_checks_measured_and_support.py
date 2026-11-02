@@ -13,7 +13,6 @@ SOFA_SENSORS = {
     "o2sat": {"idx": 35, "worse": "low"},
 }
 
-# --- Load everything (all files already exist from earlier steps) ---
 X = np.load("tpc_X_scaled.npy")
 tpc_rows = np.load("tpc_test_rows.npy")
 y_test = np.load("tpc_test_targets_fixed.npy")
@@ -37,9 +36,7 @@ def partial_correlation(x, y, controls):
     ry = y - LinearRegression().fit(controls, y).predict(controls)
     return spearmanr(rx, ry)[0]
 
-# ---------------------------------------------------------------------
-# A. Does restricting to REALLY MEASURED patients change the picture?
-# ---------------------------------------------------------------------
+# A. Does restricting to really measured patients change the picture?
 print("\n=== A. Dose-response by how much the sensor was really measured ===")
 rows = []
 for name, info in SOFA_SENSORS.items():
@@ -65,9 +62,7 @@ for name, info in SOFA_SENSORS.items():
     print()
 pd.DataFrame(rows).to_csv("why_check_measured_only.csv", index=False)
 
-# ---------------------------------------------------------------------
 # B. Organ-support masking: is o2sat still "backwards" within FiO2 groups?
-# ---------------------------------------------------------------------
 print("=== B. o2sat vs true LOS, within FiO2 (respiratory support) tertiles ===")
 fio2 = X_test[:, 19, :].mean(axis=1)
 o2_abn = -X_test[:, 35, :].mean(axis=1)

@@ -13,7 +13,7 @@ def partial_corr(x, y, controls):
     ry = y - LinearRegression().fit(controls, y).predict(controls)
     return spearmanr(rx, ry)[0]
 
-# --- Check 1: platelets, monitoring-intensity test ---
+# Check 1: platelets, monitoring-intensity test
 plt_idx = 39
 raw = X_test[:, plt_idx, :].mean(axis=1)
 abn = -raw   # low platelets = worse
@@ -28,7 +28,7 @@ print(f"...controlling for how often platelets were measured: rho={rho_ctrl:+.3f
 reduction = 100 * (1 - abs(rho_ctrl) / abs(rho_raw)) if rho_raw != 0 else float("nan")
 print(f"Reduction in magnitude: {reduction:.1f}%")
 
-# --- Check 2: O2 sat, monitoring-intensity AND FiO2 together ---
+# Check 2: O2 sat, monitoring-intensity AND FiO2 together 
 o2_idx, fio2_idx = 35, 19
 raw_o2 = X_test[:, o2_idx, :].mean(axis=1)
 abn_o2 = -raw_o2   # low o2sat = worse

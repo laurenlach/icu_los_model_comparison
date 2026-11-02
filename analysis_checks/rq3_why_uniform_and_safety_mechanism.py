@@ -25,10 +25,8 @@ df["bat_error"] = df.bat_pred - df.bat_true
 df["bat_dangerous"] = df.bat_error <= -3.0
 df["tpc_dangerous"] = df.tpc_error <= -3.0
 
-# ---------------------------------------------------------------------
 # Check 1: does the BAT-vs-TPC MAE gap size vary with phenotype
 # characteristics (n patients, mean true LOS)?
-# ---------------------------------------------------------------------
 print("=== Check 1: does gap size vary systematically by phenotype? ===")
 summary = df.dropna(subset=["phenotype"]).groupby("phenotype").agg(
     n=("tpc_true", "size"),
@@ -47,10 +45,8 @@ print(summary.sort_values("mae_gap", ascending=False).head(5)[["phenotype","n","
 print("\nTop 5 phenotypes where BAT's advantage is SMALLEST:")
 print(summary.sort_values("mae_gap").head(5)[["phenotype","n","mean_true_los","mae_gap"]].to_string(index=False))
 
-# ---------------------------------------------------------------------
 # Check 2: within each phenotype, is TPC's dangerous-case advantage
 # concentrated in that phenotype's own long-stay (top-quintile) patients?
-# ---------------------------------------------------------------------
 print("\n=== Check 2: is the safety pattern the same long-stay mechanism, per phenotype? ===")
 results = []
 for name, group in df.dropna(subset=["phenotype"]).groupby("phenotype"):

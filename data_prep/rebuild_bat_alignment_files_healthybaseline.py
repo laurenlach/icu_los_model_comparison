@@ -27,9 +27,7 @@ for organ, sensor_idx in ORGAN_SENSOR_MAP.items():
     })
     out_df = out_df.merge(sofa[["stay_id", organ]], on="stay_id", how="inner")
 
-    # FIX: drop rows where this organ's SOFA sub-score is missing, same as
-    # the original alignment-file build process (some organs, e.g. liver and
-    # respiratory, have substantial missingness - see Phase F notes)
+
     before = len(out_df)
     out_df = out_df.dropna(subset=[organ])
     after = len(out_df)

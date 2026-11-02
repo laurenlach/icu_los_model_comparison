@@ -25,11 +25,11 @@ healthy_values = {
 
 healthy_raw = np.array([healthy_values[f] for f in feature_names])
 
-# Load the CONFIRMED-correct means/stds (validated exact match, 0.00000000 diff)
+# Load the correct means/stds 
 feature_means = np.load("bat_feature_means.npy")
 feature_stds = np.load("bat_feature_stds.npy")
 
-# Convert to Z-scored space — same transform applied to every real patient
+# Convert to Z-scored space 
 healthy_zscored = (healthy_raw - feature_means) / feature_stds
 
 np.save("healthy_baseline_raw.npy", healthy_raw)

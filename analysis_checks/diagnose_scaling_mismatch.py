@@ -15,8 +15,7 @@ feature_names = [
     "po2", "ptt", "resp", "sbp", "temp", "tnt", "urine", "wbc"
 ]
 
-# --- Check 1: does the mismatch spread evenly across ALL features, or   ---
-# --- concentrate in just a few? This tells us "rounding noise" vs "bug" ---
+# Check 1: does the mismatch spread evenly across all features, or concentrate in just a few? 
 X_train_raw = X[train_rows]
 our_scaled_train = (X_train_raw - feature_means) / feature_stds
 actual_scaled_train = X_scaled_actual[train_rows]
@@ -33,8 +32,7 @@ print(f"\nOverall: {np.mean(per_feature_max_diff < 0.01)*100:.1f}% of features "
       f"have max_diff < 0.01")
 print(f"Median max_diff across features: {np.median(per_feature_max_diff):.6f}")
 
-# --- Check 2: does using sample std (ddof=1) instead of population std ---
-# --- (ddof=0, numpy's default, what we used) close the gap?            ---
+# Check 2: does using sample std (ddof=1) instead of population std (ddof=0, numpy's default, what was used) close the gap?            ---
 f = sorted_idx[0]  # worst-offending feature
 observed_vals = X_train_raw[:, :, f][mask[train_rows][:, :, f] == 1]
 std_pop = observed_vals.std(ddof=0)   # what we used
@@ -43,6 +41,6 @@ print(f"\nWorst feature ({feature_names[f]}): "
       f"population std={std_pop:.4f}, sample std={std_sample:.4f}, "
       f"our saved std={feature_stds[f]:.4f}")
 
-# --- Check 3: is this float32 precision noise? Check dtype ---
+# Check 3: is this float32 precision noise? Check dtype 
 print(f"\nbat_X.npy dtype: {X.dtype}")
 print(f"bat_X_scaled.npy dtype: {X_scaled_actual.dtype}")

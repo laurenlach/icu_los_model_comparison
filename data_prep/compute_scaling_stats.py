@@ -1,6 +1,6 @@
 import numpy as np
 
-# --- Load raw (unscaled) data, mask, and training split ---
+#  Load raw (unscaled) data, mask, and training split 
 X = np.load("bat_X.npy")             # shape: (51835, 24, 48) - raw clinical values
 mask = np.load("bat_mask.npy")       # shape: (51835, 24, 48) - 1=observed, 0=filled/padded
 train_rows = np.load("bat_train_rows.npy")  # indices of training patients
@@ -9,12 +9,11 @@ print("X shape:", X.shape)
 print("mask shape:", mask.shape)
 print("Number of training patients:", len(train_rows))
 
-# --- Subset to training patients only (scaling must never use val/test data) ---
+# Subset to training patients
 X_train = X[train_rows]        # shape: (n_train, 24, 48)
 mask_train = mask[train_rows]  # shape: (n_train, 24, 48)
 
-# --- Compute mean/std per feature, using ONLY genuinely-observed values ---
-# (i.e. excluding forward-filled/padded timesteps, per your original preprocessing logic)
+# Compute mean/std per feature 
 n_features = X_train.shape[2]
 feature_means = np.zeros(n_features)
 feature_stds = np.zeros(n_features)
@@ -33,13 +32,12 @@ np.save("bat_feature_means.npy", feature_means)
 np.save("bat_feature_stds.npy", feature_stds)
 print("\nSaved: bat_feature_means.npy, bat_feature_stds.npy")
 
-# ---------------------------------------------------------------------------
+
+
+
 # VALIDATION: apply our recomputed mean/std to a real patient's raw data,
 # and confirm it matches bat_X_scaled.npy for that same patient.
-# If this doesn't match closely, STOP — something about our recomputation
-# doesn't match the original scaling logic, and the healthy baseline would
-# be built on wrong numbers.
-# ---------------------------------------------------------------------------
+
 X_scaled_actual = np.load("bat_X_scaled.npy")
 
 test_patient_idx = train_rows[0]  # a real training patient, known to be scaled originally

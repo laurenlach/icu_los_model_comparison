@@ -45,12 +45,9 @@ def predict(X_arr, static_arr, batch_size=1024):
 
 baseline_preds = predict(X_test, static_test)
 
-# ---------------------------------------------------------------------
-# Part 1: dose-response via direct ablation (same method as the original
-# TPC/BAT ablation check -- cohort-mean replacement, same rule for both)
-# ---------------------------------------------------------------------
+# Part 1: dose-response via direct ablation 
 print("=== Dose-response (direct ablation): alignment-penalty TPC vs original TPC ===")
-ORIGINAL_SIGNED_RHO = {  # from the earlier ablation_dose_response_tpc_cohortmean.py run
+ORIGINAL_SIGNED_RHO = { 
     "map": -0.890, "bun": +0.878, "crea": -0.747, "bili": +0.311,
     "plt": +0.130, "fio2": +0.520, "o2sat": -0.723,
 }
@@ -74,9 +71,8 @@ for name, info in SOFA_SENSORS.items():
     print(f"{name:6s} alignment-penalty rho={rho_signed:+.3f} (mean|effect|={mean_abs_effect:.3f}d) "
           f"| original TPC rho={orig:+.3f} | {moved}")
 
-# ---------------------------------------------------------------------
+
 # Part 2: dangerous-case rate
-# ---------------------------------------------------------------------
 y_test = np.load("tpc_test_targets_fixed.npy")
 error = baseline_preds - y_test
 dangerous = error <= -3.0

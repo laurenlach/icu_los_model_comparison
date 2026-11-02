@@ -16,7 +16,7 @@ rows = np.load("tpc_test_rows.npy")
 y = np.load("tpc_test_targets_fixed.npy")
 X_test = X[rows]                                    # (n, 48, 24)
 
-# ---------- 1. Sweep: implausibly extreme standardised values in ANY feature ----------
+#1. Sweep: implausibly extreme standardised values in ANY feature 
 print("=== 1. Patients with |z| > 10 at any hour, per feature ===")
 sweep = []
 for j, f in enumerate(feature_names):
@@ -27,7 +27,7 @@ for j, f in enumerate(feature_names):
 for f, lo, hi in sorted(sweep, key=lambda t: -(t[1] + t[2]))[:15]:
     print(f"{f:8s} z < -10: {lo:5d} patients | z > +10: {hi:5d} patients")
 
-# ---------- 2. The o2sat artifact ----------
+# 2. The o2sat artifact 
 o2 = X_test[:, 35, :]
 art = o2.min(axis=1) < -10                          # any impossible-looking reading
 art_last = o2[:, -1] < -10                          # impossible reading in the LAST hour
@@ -37,7 +37,7 @@ print(f"Patients with it in the LAST hour: {art_last.sum()} ({100*art_last.mean(
 print("Most common values below z=-10 (rounded):")
 print(pd.Series(np.round(o2[o2 < -10], 2)).value_counts().head(5).to_string())
 
-# ---------- 3. What happens to these patients? ----------
+# 3. What happens to these patients?
 RAW = r"..\mimic-iii-clinical-database-1.4\mimic-iii-clinical-database-1.4"
 adm = pd.read_csv(os.path.join(RAW, "ADMISSIONS.csv.gz")); adm.columns = adm.columns.str.lower()
 icu = pd.read_csv(os.path.join(RAW, "ICUSTAYS.csv.gz")); icu.columns = icu.columns.str.lower()
@@ -56,7 +56,7 @@ print(f"\nICU death rate: artifact patients {100*died[art].mean():.1f}% vs other
 print(f"Median true LOS: artifact patients {np.median(y[art]):.2f} d vs others {np.median(y[~art]):.2f} d")
 print(f"Share with LOS < 1 day: artifact {100*(y[art] < 1).mean():.1f}% vs others {100*(y[~art] < 1).mean():.1f}%")
 
-# ---------- 4. o2sat dose-response with and without the artifact patients ----------
+#4. o2sat dose-response with and without the artifact patients 
 abn = -o2.mean(axis=1)
 tpc_attr = np.abs(np.load("tpc_shap_values_full_testset_fixed.npy").squeeze(-1)).mean(axis=2)[:, 35]
 bat_attr = np.abs(np.load("bat_ig_values_full_testset_healthybaseline.npy")).mean(axis=2)[:, 35]

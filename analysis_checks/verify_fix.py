@@ -1,11 +1,3 @@
-# from icu_benchmarks.constants import RunMode
-# from icu_benchmarks.models.dl_models.tpc import TPC
-
-# m = TPC(input_size=(64,48,24), static_size=4, n_layers=3, kernel_size=3, temp_kernels=4, point_size=8, dropout=0.1, run_mode=RunMode.regression)
-# print('Model built successfully')
-# print(m.final_linear)
-
-
 import torch
 from icu_benchmarks.constants import RunMode
 from icu_benchmarks.models.dl_models.tpc import TPC

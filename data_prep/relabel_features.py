@@ -1,6 +1,6 @@
 import pandas as pd
 
-# The real, ordered feature names — pulled directly from dyn.parquet via get_feature_names.py
+
 feature_names = [
     "alb", "alp", "alt", "ast", "be", "bicar", "bili", "bili_dir", "bnd", "bun",
     "ca", "cai", "ck", "ckmb", "cl", "crea", "crp", "dbp", "fgn", "fio2",
@@ -9,10 +9,10 @@ feature_names = [
     "po2", "ptt", "resp", "sbp", "temp", "tnt", "urine", "wbc"
 ]
 
-# Load the results we saved earlier (currently labeled feature_0, feature_1, ...)
+
 df = pd.read_csv("feature_importance_comparison.csv")
 
-# Replace the placeholder names with the real ones, in the same order
+
 df["feature"] = feature_names
 
 df.to_csv("feature_importance_comparison.csv", index=False)

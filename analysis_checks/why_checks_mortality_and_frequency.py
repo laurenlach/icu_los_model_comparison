@@ -33,7 +33,7 @@ def partial_correlation(x, y, controls):
     ry = y - LinearRegression().fit(controls, y).predict(controls)
     return spearmanr(rx, ry)[0]
 
-# ---------------- Build death flags for the test patients ----------------
+# Build death flags for the test patients 
 adm = pd.read_csv(adm_path); adm.columns = adm.columns.str.lower()
 icu = pd.read_csv(icu_path); icu.columns = icu.columns.str.lower()
 m = icu[["icustay_id", "hadm_id", "outtime"]].merge(
@@ -62,7 +62,7 @@ hosp_death = test["hospital_death"].fillna(0).values.astype(bool)
 print(f"\nICU deaths: {icu_death.sum()} ({100*icu_death.mean():.1f}%) | in-hospital deaths: {hosp_death.sum()} ({100*hosp_death.mean():.1f}%)")
 print(f"Median true LOS: ICU deaths = {np.median(y[icu_death]):.2f} d, survivors = {np.median(y[~icu_death]):.2f} d")
 
-# ---------------- A/B: does the backwards pattern survive removing deaths? ----------------
+# A/B: does the backwards pattern survive removing deaths? 
 print("\n=== Correlation of sensor abnormality with TRUE LOS ===")
 print(f"{'sensor':6s} | {'all':>7s} | {'no ICU deaths':>13s} | {'ICU deaths only':>15s} | {'no hosp deaths':>14s} | {'partial (ctrl ICU death)':>24s}")
 for name, info in SOFA_SENSORS.items():
@@ -82,7 +82,7 @@ for name, info in SOFA_SENSORS.items():
     abn = -raw if info["worse"] == "low" else raw
     print(f"{name:6s} rho={spearmanr(abn, icu_death.astype(float))[0]:+.3f}")
 
-# ---------------- C: does feature importance follow how often a feature is measured? ----------------
+# C: does feature importance follow how often a feature is measured? 
 print("\n=== C. Permutation importance vs how often each feature is really measured ===")
 mask = np.load("bat_mask.npy")[np.load("bat_test_rows.npy")]
 observed = mask.mean(axis=(0, 1))                 # fraction of patient-hours measured, per feature

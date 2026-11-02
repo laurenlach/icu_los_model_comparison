@@ -16,7 +16,7 @@ icd_data["icd9_code"] = icd_data["icd9_code"].astype(str)
 stay_id_order = pd.read_csv("bat_stay_id_order.csv")
 cohort_icd = stay_id_order.merge(icd_data, on="stay_id", how="left")
 
-# Check: does the code exist SOMEWHERE in the full scheme (any of 283 categories)?
+# Check: does the code exist in the full scheme (any of 283 categories)?
 def check_match(code):
     if pd.isna(code):
         return "no_code_at_all"

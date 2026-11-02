@@ -5,8 +5,6 @@ tpc_shap = np.load("tpc_shap_values_full_testset.npy").squeeze(-1)  # (10367, 48
 print("Shape:", tpc_shap.shape)
 print("Overall min/max/mean (raw, signed, not abs):", tpc_shap.min(), tpc_shap.max(), tpc_shap.mean())
 
-# Check a handful of individual patients at hour 0 vs hour 23, full precision,
-# not rounded - are hour-0 values genuinely exactly zero, or just very small?
 print("\n=== Patient 0, feature 'o2sat' (index 35), all 24 hours, full precision ===")
 for h in range(24):
     print(f"  hour {h}: {tpc_shap[0, 35, h]:.10f}")

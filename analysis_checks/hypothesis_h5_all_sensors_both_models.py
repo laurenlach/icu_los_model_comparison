@@ -87,7 +87,7 @@ def run_check(X_test, attr_mean, model_name, results):
 
 results = []
 
-# --- TPC (fixed) ---
+# TPC 
 tpc_X = np.load("tpc_X_scaled.npy")
 tpc_test_rows = np.load("tpc_test_rows.npy")
 tpc_X_test = tpc_X[tpc_test_rows]
@@ -95,7 +95,7 @@ tpc_shap = np.load("tpc_shap_values_full_testset_fixed.npy").squeeze(-1)
 tpc_attr = np.abs(tpc_shap).mean(axis=2)
 run_check(tpc_X_test, tpc_attr, "TPC (fixed)", results)
 
-# --- BAT (healthy-baseline IG) ---
+# BAT (healthy-baseline IG) 
 bat_X = np.load("bat_X_scaled.npy")
 bat_test_rows = np.load("bat_test_rows.npy")
 bat_X_test = np.transpose(bat_X[bat_test_rows], (0, 2, 1))  # -> (n, 48, 24)

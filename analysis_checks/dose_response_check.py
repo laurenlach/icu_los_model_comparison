@@ -12,9 +12,7 @@ SOFA_SENSORS = {
     "o2sat": {"idx": 35, "worse": "low"},
 }
 
-# ---------------------------------------------------------------------------
 # 1. Load raw (Z-scored) feature values and attribution, for both models
-# ---------------------------------------------------------------------------
 X = np.load("bat_X_scaled.npy")                     # (51835, 24, 48)
 test_rows = np.load("bat_test_rows.npy")
 X_test = X[test_rows].mean(axis=1)                  # (10367, 48) - mean over window
@@ -25,12 +23,10 @@ bat_ig = np.load("bat_ig_values_full_testset_healthybaseline.npy")  # (10367, 48
 tpc_attr_mean = np.abs(tpc_shap).mean(axis=2)       # (10367, 48) - mean |attribution| over window
 bat_attr_mean = np.abs(bat_ig).mean(axis=2)         # (10367, 48)
 
-# ---------------------------------------------------------------------------
 # 2. For each SOFA sensor, convert raw value into "abnormality in the worse
 #    direction" (higher = more abnormal, regardless of whether worse means
 #    higher or lower for that specific sensor), then correlate against
 #    attribution for that same sensor
-# ---------------------------------------------------------------------------
 results = []
 for name, info in SOFA_SENSORS.items():
     idx = info["idx"]
@@ -56,11 +52,9 @@ print("=== Dose-response: does attribution rise as the sensor gets more abnormal
 print("(Positive rho = attribution rises with severity, as expected for real reasoning)\n")
 print(results_df.to_string(index=False))
 
-# ---------------------------------------------------------------------------
 # 3. Decile view for one sensor per model, to see the SHAPE, not just the
 #    correlation strength - is it a smooth rise, or a step, or flat then
 #    jumping only at the extreme?
-# ---------------------------------------------------------------------------
 def decile_shape(abnormality, attribution, sensor_name, model_name):
     df = pd.DataFrame({"abnormality": abnormality, "attribution": attribution})
     df["decile"] = pd.qcut(df["abnormality"], 10, labels=False, duplicates="drop")

@@ -28,7 +28,7 @@ def run_sibling_check(X_test, attr_mean, model_name):
     for name, info in SOFA_SENSORS.items():
         idx = info["idx"]
 
-        # Find this sensor's top-2 most correlated OTHER features (its "siblings")
+        # Find this sensor's top-2 most correlated OTHER features
         this_vals = X_test[:, idx, :].mean(axis=1)
         correlations = []
         for j in range(48):

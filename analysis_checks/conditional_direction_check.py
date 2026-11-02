@@ -12,7 +12,7 @@ SOFA_SENSORS = {
     "o2sat": {"idx": 35, "worse": "low"},
 }
 
-# Signed ablation rhos from your earlier runs (cohort-mean replacement, all patients)
+# Signed ablation rhos from earlier runs (cohort-mean replacement, all patients)
 TPC_ABL = {"map": -0.890, "bun": +0.878, "crea": -0.747, "bili": +0.311, "plt": +0.130, "fio2": +0.520, "o2sat": -0.723}
 BAT_ABL = {"map": -0.770, "bun": +0.707, "crea": +0.231, "bili": +0.401, "plt": +0.227, "fio2": +0.104, "o2sat": -0.495}
 
