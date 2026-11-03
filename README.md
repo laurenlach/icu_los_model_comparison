@@ -32,13 +32,7 @@ Scripts ending in `_fixed` are the final versions. They were run after a correct
 
 ## Changes to YAIB
 
-The `YAIB/` folder is the YAIB framework as modified by Jagd et al. (https://github.com/Katja-Jagd/YAIB, `development` branch). Almost all of it is unchanged. The files changed for this project are:
-
-- `YAIB/icu_benchmarks/models/dl_models/tpc.py`: the TPC model (added, then corrected)
-- `YAIB/configs/prediction_models/BAT_LOS.gin`: BAT configuration for LOS
-- `YAIB/configs/prediction_models/common/DLCommon_nodsa.gin`: edited common configuration
-
-In `data_prep/r_cohort/`, the files above are edits of the YAIB-cohorts R scripts (https://github.com/rvandewater/YAIB-cohorts). The other YAIB-cohorts files are unchanged and are not included.
+The `YAIB/` folder is the YAIB framework as modified by Jagd et al. (https://github.com/Katja-Jagd/YAIB). The R scripts in `data_prep/r_cohort/` are edits of the YAIB-cohorts scripts (https://github.com/rvandewater/YAIB-cohorts).
 
 ## Data (not included)
 
@@ -50,22 +44,15 @@ To reproduce this work you need credentialed access to **MIMIC-III v1.4** from P
 - MIMIC-IV and eICU checkpoint: `Katja-Jagd/bat-pretrained-eicu-mimiciv-base` on Hugging Face
 
 
-## Running the pipeline
+## Running the code
 
-Run the steps in this order.
+Run the steps in this order:
 
-1. **Pick the cohort (R).** Install `ricu` and convert MIMIC-III for it. Next to the `R/` folder, create a `config.yaml` with two lines: `ricu_data_path` (where the converted MIMIC data is) and `out_dir` (where the output should go). Then run `base_cohort.R` followed by `los.R` from inside the `R` folder.
-2. **Build the datasets.** Run the scripts in `data_prep/`. They create the input arrays for BAT and TPC, scale the features, build the healthy reference baseline and map each patient to a diagnosis group.
-3. **Train the models.** TPC is small enough to train on a laptop CPU using the scripts in `training/`. BAT needs a GPU, so it was fine-tuned on Google Colab using the notebooks in `training/`.
-4. **Evaluate and explain.** Run the scripts in `evaluation/` to measure accuracy, then `interpretability/` to see which inputs each model relies on. After that, run `analysis_checks/` and `figures/`.
+1. **Cohort.** Run `base_cohort.R`, then `los.R`, from `data_prep/r_cohort/` (needs `ricu`, MIMIC-III and a `config.yaml` with `ricu_data_path` and `out_dir`).
+2. **Datasets.** Run the scripts in `data_prep/`.
+3. **Training.** TPC trains on a laptop CPU with the scripts in `training/`. BAT was fine-tuned on a Google Colab GPU using the notebooks in `training/`.
+4. **Results.** Run `evaluation/`, then `interpretability/`, `analysis_checks/` and `figures/`.
 
-SOFA scores were pulled with ricu's `load_concepts` in an interactive R session, not saved as a script. The analysis scripts read the resulting tables.
- 
+SOFA scores were pulled with ricu's `load_concepts` in an interactive R session.
 
-## Environment notes
-
-- Python 3 with PyTorch, `shap`, `captum`, `torchmetrics`, `pytorch-lightning`, `gin-config`, `pytorch-ignite==0.5.0.post2` and `einops==0.6.1`.
-- **`x-transformers` must be pinned to `1.16.23`.** Newer versions rename internal layers, which makes the pretrained checkpoint load incorrectly.
-- Several scripts contain absolute Windows paths (for example `C:\Users\<name>\...`). Edit these to match your own folders before running.
-- Hardware used: TPC training and SHAP on a laptop CPU, BAT fine-tuning and Integrated Gradients on a Colab GPU (T4 or L4).
-
+Python 3 with PyTorch, `shap`, `captum`, `torchmetrics`, `pytorch-lightning`, `gin-config`, `pytorch-ignite==0.5.0.post2` and `einops==0.6.1`. Pin `x-transformers==1.16.23`, because newer versions make the pretrained checkpoint load incorrectly. Some scripts contain absolute Windows paths that need editing to your own folders.
