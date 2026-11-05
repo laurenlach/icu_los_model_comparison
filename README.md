@@ -42,17 +42,3 @@ To reproduce this work you need credentialed access to **MIMIC-III v1.4** from P
 
 - MIMIC-III and MIMIC-IV checkpoint: `Katja-Jagd/bat-pretrained-mimiciii-mimiciv-base` on Hugging Face
 - MIMIC-IV and eICU checkpoint: `Katja-Jagd/bat-pretrained-eicu-mimiciv-base` on Hugging Face
-
-
-## Running the code
-
-Run the steps in this order:
-
-1. **Cohort.** Run `base_cohort.R`, then `los.R`, from `data_prep/r_cohort/` (needs `ricu`, MIMIC-III and a `config.yaml` with `ricu_data_path` and `out_dir`).
-2. **Datasets.** Run the scripts in `data_prep/`.
-3. **Training.** TPC trains on a laptop CPU with the scripts in `training/`. BAT was fine-tuned on a Google Colab GPU using the notebooks in `training/`.
-4. **Results.** Run `evaluation/`, then `interpretability/`, `analysis_checks/` and `figures/`.
-
-SOFA scores were pulled with ricu's `load_concepts` in an interactive R session.
-
-Python 3 with PyTorch, `shap`, `captum`, `torchmetrics`, `pytorch-lightning`, `gin-config`, `pytorch-ignite==0.5.0.post2` and `einops==0.6.1`. Pin `x-transformers==1.16.23`, because newer versions make the pretrained checkpoint load incorrectly. Some scripts contain absolute Windows paths that need editing to your own folders.
