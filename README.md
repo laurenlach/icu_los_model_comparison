@@ -6,7 +6,7 @@ BSc Honours research project, School of Computer Science and Applied Mathematics
 
 ## What this project does
 
-This project compares two models for predicting ICU length of stay (LOS) on MIMIC-III.
+This project compares two models for predicting ICU length of stay on MIMIC-III.
 
 - **Bi-Axial Transformer** (BAT, Jagd et al.), a clinical time series foundation model.
 - **Temporal Pointwise Convolution** (TPC, Rocheteau et al.), a specialised model designed for ICU LOS prediction. 
@@ -38,7 +38,4 @@ The `YAIB/` folder is the YAIB framework as modified by Jagd et al. (https://git
 
 No patient data is included, because the MIMIC-III licence does not allow redistribution.
 
-To reproduce this work you need credentialed access to **MIMIC-III v1.4** from PhysioNet (https://physionet.org/content/mimiciii/1.4/). The pretrained BAT weights are not included either:
-
-- MIMIC-III and MIMIC-IV checkpoint: `Katja-Jagd/bat-pretrained-mimiciii-mimiciv-base` on Hugging Face
-- MIMIC-IV and eICU checkpoint: `Katja-Jagd/bat-pretrained-eicu-mimiciv-base` on Hugging Face
+To reproduce this work you need credentialed access to **MIMIC-III v1.4** from PhysioNet (https://physionet.org/content/mimiciii/1.4/). The pretrained BAT weights are not included either.
